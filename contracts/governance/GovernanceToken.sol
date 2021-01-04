@@ -19,10 +19,10 @@ contract GovernanceToken is ERC20 {
     mapping(address => address) public delegates;
 
     event VoteWeightsSnapshot(uint256 id);
-    event DelegatedChanged(
+    event DelegateChanged(
         address indexed delegator,
-        address indexed delegateFrom,
-        address indexed delegateTo
+        address indexed fromDelegate,
+        address indexed toDelegate
     );
     event VoteWeightChanged(
         address indexed delegate,
@@ -59,31 +59,70 @@ contract GovernanceToken is ERC20 {
         return snapshotted ? value : voteWeightOf(account);
     }
 
-    modifier trackVoteWeightOf(address delegate) {
+    function totalVoteWeightAt(uint256 snapshotId) public view returns (uint256) {
+        require(snapshotId <= _currentSnapshotId, 'GovernanceToken: invalid id');
+        (bool snapshotted, uint256 value) =
+            _totalVoteWeightSnapshots.getValueAt(snapshotId);
+
+        return snapshotted ? value : totalVoteWeight();
+
+    }
+
+    modifier _trackVoteWeightOf(address delegate) {
         uint256 fromVoteWeight = voteWeightOf(delegate);
         _;
         uint256 toVoteWeight = voteWeightOf(delegate);
 
         if (fromVoteWeight != toVoteWeight) {
-            _updateAccountVoteWeightSnapshot(delegate, toVoteWeight);
+            _updateAccountVoteWeightSnapshot(delegate, fromVoteWeight);
             emit VoteWeightChanged(delegate, fromVoteWeight, toVoteWeight);
         }
     }
 
     function delegateVoteWeightTo(address newDelegate)
         external
-        trackVoteWeightOf(msg.sender)
+        _trackVoteWeightOf(msg.sender)
     {
         address oldDelegate = delegates[msg.sender];
         require(oldDelegate != newDelegate, 'GovToken: Must delegate to new');
 
         delegates[msg.sender] = newDelegate;
-        emit DelegatedChanged(msg.sender, oldDelegate, newDelegate);
+        emit DelegateChanged(msg.sender, oldDelegate, newDelegate);
 
         uint256 sendersBalance = balanceOf(msg.sender);
 
         _decreaseDelegatedVoteWeight(oldDelegate, sendersBalance);
         _increaseDelegatedVoteWeight(newDelegate, sendersBalance);
+    }
+
+    function _transfer(address sender, address recipient, uint256 amount)
+        internal
+        virtual
+        override
+        _trackVoteWeightOf(sender)
+        _trackVoteWeightOf(recipient)
+    {
+        super._transfer(sender, recipient, amount);
+    }
+
+    function _mint(address recipient, uint256 amount)
+        internal
+        virtual
+        override
+        _trackVoteWeightOf(recipient)
+    {
+        _updateTotalVoteWeightSnapshot();
+        super._mint(recipient, amount);
+    }
+
+    function _burn(address account, uint256 amount)
+        internal
+        virtual
+        override
+        _trackVoteWeightOf(account)
+    {
+        _updateTotalVoteWeightSnapshot();
+        super._burn(account, amount);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 amount)
@@ -131,7 +170,7 @@ contract GovernanceToken is ERC20 {
         uint256 newDelegatedVoteWeight
     )
         internal
-        trackVoteWeightOf(delegate)
+        _trackVoteWeightOf(delegate)
     {
         _delegatedVoteWeight[delegate] = newDelegatedVoteWeight;
     }
