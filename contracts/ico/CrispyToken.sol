@@ -14,6 +14,9 @@ contract CrispyToken is FlashMintERC20, Ownable {
 
     bytes32 internal immutable APPROVE_SEP;
     mapping(address => uint256) internal _usedNonces;
+    mapping(address => uint256) internal _lockTimes;
+
+    event BalanceLocked(address indexed account, uint256 unlockTime);
 
     constructor(uint256 flashMintMax_, uint192 flashBorrowRate_)
         FlashMintERC20(
@@ -26,6 +29,14 @@ contract CrispyToken is FlashMintERC20, Ownable {
     {
         bytes32 domainSeparator = keccak256(abi.encode(name(), address(this)));
         APPROVE_SEP = keccak256(abi.encode(domainSeparator, approve.selector));
+    }
+
+    function lockBalance(uint256 unlockTime) external {
+        require(unlockTime > _lockTimes[msg.sender], "CRUNCH: Invalid unlock time");
+        require(unlockTime > block.timestamp, "CRUNCH: Unlock time passed");
+
+        _lockTimes[msg.sender] = unlockTime;
+        emit BalanceLocked(msg.sender, unlockTime);
     }
 
     function approveWithSignature(
@@ -70,6 +81,10 @@ contract CrispyToken is FlashMintERC20, Ownable {
         _mint(recipient, amount);
     }
 
+    function getUnlockTime(address account) public view returns (uint256) {
+        return _lockTimes[account];
+    }
+
     function getUsedNonces(address account) public view returns (uint256) {
         return _usedNonces[account];
     }
@@ -96,5 +111,12 @@ contract CrispyToken is FlashMintERC20, Ownable {
             'CRUNCH: Minting beyond hard cap'
         );
         super._mint(account, amount);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal override
+    {
+        super._beforeTokenTransfer(from, to, amount);
+        require(block.timestamp >= _lockTimes[from], "CRUNCH: Balance locked");
     }
 }

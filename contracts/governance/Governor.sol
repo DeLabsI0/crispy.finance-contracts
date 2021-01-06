@@ -26,19 +26,29 @@ contract Governor {
      * @param bondToken address of ERC20 token used for bond
      */
     struct Governed {
-        bool canBeCalled;
 
         uint256 prepPhaseDuration;
         uint256 votePhaseDuration;
 
-        uint192 proposalTax; // percent of threshhold sent to 
-        uint192 proposalThreshhold;
-        uint192 passRatio;
+        uint64 proposalTax; // percent of threshhold sent to 
+        uint64 proposalThreshhold;
+        uint64 passRatio;
 
+        bool canBeCalled;
         bool isEmergencyMeasure;
         uint256 bondAmount;
         address bondToken;
     }
+    event GovernedParametersUpdated(
+        address indexed governed,
+        uint256 prepPhaseDuration,
+        uint256 votePhaseDuration,
+        uint256 packedFractions, // passRatio | proposalThreshhold | proposalTax
+        bool canBeCalled,
+        bool isEmergencyMeasure,
+        uint256 bondAmount,
+        address bondToken
+    );
 
     struct Action {
         address target;
@@ -58,31 +68,64 @@ contract Governor {
     mapping(bytes32 => Proposal) internal _proposals;
 
     constructor(
-        uint192 selfCallTax,
-        uint192 selfCallThreshhold,
-        uint192 selfPassRatio,
+        uint64 selfCallTax,
+        uint64 selfCallThreshhold,
+        uint64 selfPassRatio,
         uint256 selfPrepDuration,
         uint256 selfVoteDuration,
         address voteWeightOracle_
     ) {
-        governedParameters[address(this)] = Governed({
-            canBeCalled: true,
-            prepPhaseDuration: selfPrepDuration,
-            votePhaseDuration: selfVoteDuration,
-            proposalTax: selfCallTax,
-            proposalThreshhold: selfCallThreshhold,
-            passRatio: selfPassRatio,
-            isEmergencyMeasure: false,
-            bondAmount: 0,
-            bondToken: address(0)
-        });
+        Governed storage selfGoverned = governedParameters[address(this)];
+        selfGoverned.canBeCalled = true;
+        selfGoverned.prepPhaseDuration = selfPrepDuration;
+        selfGoverned.votePhaseDuration = selfVoteDuration;
+        selfGoverned.proposalTax = selfCallTax;
+        selfGoverned.proposalThreshhold = selfCallThreshhold;
+        selfGoverned.passRatio = selfPassRatio;
 
+        _updatedGoverned(address(this));
         _setVoteWeightOracle(voteWeightOracle_);
     }
 
     modifier onlySelf() {
         require(msg.sender == address(this), "Governor: Not authorized");
         _;
+    }
+
+    function updateGovernedParams(
+        address governed,
+        uint256 prepPhaseDuration,
+        uint256 votePhaseDuration,
+        uint256 packedFractions, // passRatio | proposalThreshhold | proposalTax
+        bool canBeCalled,
+        bool isEmergencyMeasure,
+        uint256 bondAmount,
+        address bondToken,
+        bytes memory callData
+    )
+        external
+        onlySelf
+    {
+        uint64 proposalTax = uint64(packedFractions);
+        uint64 proposalThreshhold = uint64(packedFractions >> 64);
+        uint64 passRatio = uint64(packedFractions >> 128);
+
+        governedParameters[governed] = Governed({
+            prepPhaseDuration: prepPhaseDuration,
+            votePhaseDuration: votePhaseDuration,
+            proposalTax: proposalTax,
+            proposalThreshhold: proposalThreshhold,
+            passRatio: passRatio,
+            canBeCalled: canBeCalled,
+            isEmergencyMeasure: isEmergencyMeasure,
+            bondAmount: bondAmount,
+            bondToken: bondToken
+        });
+
+        if (callData.length > 0) {
+            (bool success,) = governed.call(callData);
+            require(success);
+        }
     }
 
     function setVoteWeightOracle(address voteWeightOracle_) external onlySelf {
@@ -104,6 +147,24 @@ contract Governor {
 
     function isComplete(bytes32 proposalId) public view returns (bool) {
         return _proposals[proposalId].completed;
+    }
+
+    function _updatedGoverned(address governed) internal {
+        Governed storage params = governedParameters[governed];
+        uint256 packedFractions = uint256(params.proposalTax)
+            | (uint256(params.proposalThreshhold) << 64)
+            | (uint256(params.passRatio) << 128);
+
+        emit GovernedParametersUpdated(
+            governed,
+            params.prepPhaseDuration,
+            params.votePhaseDuration,
+            packedFractions,
+            params.canBeCalled,
+            params.isEmergencyMeasure,
+            params.bondAmount,
+            params.bondToken
+        );
     }
 
     function _setVoteWeightOracle(address voteWeightOracle_) internal {
