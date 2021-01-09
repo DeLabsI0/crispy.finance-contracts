@@ -33,7 +33,8 @@ abstract contract FeeTaker is Ownable {
     }
 
     function takeFee(uint256 amount) internal returns (uint256 remainder) {
-        (remainder, uint256 collectedFee) = FeeMath.splitToFee(amount, _fee);
+        uint256 collectedFee;
+        (remainder, collectedFee) = FeeMath.splitToFee(amount, _fee);
         _accountFee(collectedFee);
         return remainder;
     }

@@ -86,12 +86,12 @@ contract SimplePool is Ownable, IFeeRecipient {
 
     function _claimRewards() internal {
         StakeData storage userStake = _userStakeData[msg.sender];
-        uint192 accumulator = userStake.accumulator.qsub(_rewardsAccumulator)
+        uint192 accumulator = userStake.accumulator.qsub(_rewardsAccumulator);
         uint256 accruedRewards = accumulator.qmul(SafeQMath.intToQ(userStake.stakeAmount)).qToIntLossy();
         _feeToken.transfer(msg.sender, accruedRewards);
     }
 
     function _resetAccumulator() internal {
-        _userStakeData[msg.sender].accumulator = _resetAccumulator;
+        _userStakeData[msg.sender].accumulator = _rewardsAccumulator;
     }
 }

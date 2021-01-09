@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/math/SafeMath.sol';
-import '@openzeppelin/contracts/cryptography/ECDSA.sol';
-import '../token/FlashMintERC20.sol';
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/cryptography/ECDSA.sol";
+import "../token/FlashMintERC20.sol";
 
 contract CrispyToken is FlashMintERC20, Ownable {
     using SafeMath for uint256;
@@ -20,8 +20,8 @@ contract CrispyToken is FlashMintERC20, Ownable {
 
     constructor(uint256 flashMintMax_, uint192 flashBorrowRate_)
         FlashMintERC20(
-            'Crispy.finance governance & utility token',
-            'CRUNCH',
+            "Crispy.finance governance & utility token",
+            "CRUNCH",
             flashMintMax_,
             flashBorrowRate_
         )
@@ -49,8 +49,8 @@ contract CrispyToken is FlashMintERC20, Ownable {
     )
         external
     {
-        require(nonce == _usedNonces[owner], 'CRUNCH: Invalid nonce');
-        require(expiry <= block.timestamp, 'CRUNCH: allowance expired');
+        require(nonce == _usedNonces[owner], "CRUNCH: Invalid nonce");
+        require(expiry <= block.timestamp, "CRUNCH: allowance expired");
 
         bytes32 approveHash = getApproveHash(
             nonce,
@@ -108,7 +108,7 @@ contract CrispyToken is FlashMintERC20, Ownable {
     function _mint(address account, uint256 amount) internal override {
         require(
             totalSupply().add(amount) <= hardCap,
-            'CRUNCH: Minting beyond hard cap'
+            "CRUNCH: Minting beyond hard cap"
         );
         super._mint(account, amount);
     }
@@ -117,6 +117,6 @@ contract CrispyToken is FlashMintERC20, Ownable {
         internal override
     {
         super._beforeTokenTransfer(from, to, amount);
-        require(block.timestamp >= _lockTimes[from], "CRUNCH: Balance locked");
+        require(block.timestamp >= getUnlockTime(from), "CRUNCH: Balance locked");
     }
 }
