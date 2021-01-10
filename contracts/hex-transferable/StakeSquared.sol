@@ -22,10 +22,16 @@ contract StakeSquared is IERC721Receiver, Ownable {
     uint256 public emissionRate;
 
     IHex internal _hexToken;
+
     uint192 internal _rewardsAccumulator;
     uint256 internal _totalStakedShares;
 
-    mapping(uint256 => address) internal _depositors;
+    uint256 internal _rewardsEndTime;
+    uint256 internal _rewardsToDistribute;
+
+    mapping(address => uint256[]) internal _depositedTokens;
+    mapping(address => uint256) internal _stakedShares;
+    mapping(address => uint192) internal _rewardsAccumulator;
 
     constructor(
         IERC20 rewardToken_,
@@ -39,6 +45,8 @@ contract StakeSquared is IERC721Receiver, Ownable {
         emissionRate = emissionRate_;
         _hexToken = ezStaker_.hexToken();
     }
+
+    //function 
 
     function increaseEmissionRate(uint256 increasedEmissionRate)
         external
@@ -54,6 +62,34 @@ contract StakeSquared is IERC721Receiver, Ownable {
         emissionRate = increasedEmissionRate;
     }
 
+    function getMetaStakedTokenCount(address account)
+        public
+        view
+        returns(uint256)
+    {
+        return _depositedTokens[account].length;
+    }
+
+    function getMetaStakedToken(
+        address account,
+        uint256 tokenIndex
+    )
+        public
+        view
+        returns(uint256)
+    {
+        return _depositedTokens[account][tokenIndex];
+    }
+
+    function getStakedShares(uint256 tokenId) public view returns(uint256) {
+        uint256 stakeIndex = ezStaker.getStakeIndex(tokenId);
+        (,,uint72 stakeShares,,,,) = _hexToken.stakeLists(
+            address(ezStaker),
+            stakeIndex
+        );
+        return uint256(stakeShares);
+    }
+
     function onERC721Received(
         address operator,
         address from,
@@ -66,14 +102,10 @@ contract StakeSquared is IERC721Receiver, Ownable {
     {
         require(msg.sender == address(ezStaker), "Staker^2: Invalid ERC721 NFT");
 
-        _depositors[tokenId] = operator;
-        uint256 stakeIndex = ezStaker.getStakeIndex(tokenId);
-        (,,uint72 stakeShares,,,,) = _hexToken.stakeLists(
-            address(ezStaker),
-            stakeIndex
-        );
+        _depositedTokens[operator].push(tokenId);
 
-        _totalStakedShares = _totalStakedShares.add(uint256(stakeShares));
+        uint256 stakedShares = getStakedShares(tokenId);
+        _totalStakedShares = _totalStakedShares.add(stakedShares);
 
         return this.onERC721Received.selector;
     }
