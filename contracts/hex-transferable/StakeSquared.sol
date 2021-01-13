@@ -29,9 +29,13 @@ contract StakeSquared is IERC721Receiver, Ownable {
     uint256 internal _rewardsEndTime;
     uint256 internal _rewardsToDistribute;
 
-    mapping(address => uint256[]) internal _depositedTokens;
-    mapping(address => uint256) internal _stakedShares;
-    mapping(address => uint192) internal _rewardsAccumulator;
+    struct UserData {
+        uint256[] depositedTokens;
+        uint256 stakedShares;
+        uint192 rewardsAccumulator;
+    }
+
+    mapping(address => UserData) internal _userData;
 
     constructor(
         IERC20 rewardToken_,
@@ -53,7 +57,7 @@ contract StakeSquared is IERC721Receiver, Ownable {
         onlyOwner
     {
         require(
-            increasedEmissionRate > emissionRate
+            increasedEmissionRate > emissionRate,
             "Staker^2: can only increase rate"
         );
 
@@ -67,7 +71,7 @@ contract StakeSquared is IERC721Receiver, Ownable {
         view
         returns(uint256)
     {
-        return _depositedTokens[account].length;
+        return _userData[account].depositedTokens.length;
     }
 
     function getMetaStakedToken(
@@ -78,7 +82,7 @@ contract StakeSquared is IERC721Receiver, Ownable {
         view
         returns(uint256)
     {
-        return _depositedTokens[account][tokenIndex];
+        return _userData[account].depositedTokens[tokenIndex];
     }
 
     function getStakedShares(uint256 tokenId) public view returns(uint256) {
@@ -92,17 +96,17 @@ contract StakeSquared is IERC721Receiver, Ownable {
 
     function onERC721Received(
         address operator,
-        address from,
+        address,
         uint256 tokenId,
-        bytes memory data
+        bytes calldata
     )
-        public
+        external
         override
         returns (bytes4)
     {
         require(msg.sender == address(ezStaker), "Staker^2: Invalid ERC721 NFT");
 
-        _depositedTokens[operator].push(tokenId);
+        _userData[operator].depositedTokens.push(tokenId);
 
         uint256 stakedShares = getStakedShares(tokenId);
         _totalStakedShares = _totalStakedShares.add(stakedShares);

@@ -18,12 +18,16 @@ contract Treasury
 
     receive() payable external { }
 
-    function callDirect(address destination, bytes memory callData)
+    function callDirect(
+        address destination,
+        uint256 value,
+        bytes memory callData
+    )
         external
         onlyOwner
         returns (bytes memory)
     {
-        (bool success, bytes memory returnData) = destination.call(callData);
+        (bool success, bytes memory returnData) = destination.call{ value: value }(callData);
         require(success, string(returnData));
 
         return returnData;

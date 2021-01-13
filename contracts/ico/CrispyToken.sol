@@ -10,7 +10,7 @@ contract CrispyToken is FlashMintERC20, Ownable {
     using SafeMath for uint256;
     using ECDSA for bytes32;
 
-    uint256 public constant hardCap = 400 * 1e6 * 1e18; // 400 millio coins
+    uint256 public constant hardCap = 400 * 1e6 * 1e18; // 400 million coins
 
     bytes32 internal immutable APPROVE_SEP;
     mapping(address => uint256) internal _usedNonces;
