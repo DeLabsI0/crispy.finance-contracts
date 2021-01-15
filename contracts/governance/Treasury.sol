@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.7.6;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/token/ERC1155/ERC1155Holder.sol';
-import '@openzeppelin/contracts/token/ERC721/ERC721Holder.sol';
-import '../utils/SigningContract.sol';
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155Holder.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721Holder.sol";
+import "../utils/SigningContract.sol";
 
 contract Treasury
     is Ownable,
@@ -25,12 +25,9 @@ contract Treasury
     )
         external
         onlyOwner
-        returns (bytes memory)
     {
-        (bool success, bytes memory returnData) = destination.call{ value: value }(callData);
-        require(success, string(returnData));
-
-        return returnData;
+        (bool success,) = dest.call{ value: value }(callData);
+        require(success);
     }
 
     function sign(bytes32 hash) external onlyOwner {
