@@ -4,119 +4,110 @@ pragma solidity ^0.7.6;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/cryptography/ECDSA.sol";
-import "../token/FlashMintERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Capped.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract CrispyToken is FlashMintERC20, Ownable {
+contract CrispyToken is ERC20, ERC20Capped, ERC20Burnable, Ownable {
     using SafeMath for uint256;
     using ECDSA for bytes32;
 
-    uint256 public constant hardCap = 400 * 1e6 * 1e18; // 400 million coins
+    uint256 public constant HARD_CAP = 400 * 1e6 * 1e18; // 400 million coins
 
-    bytes32 internal immutable APPROVE_SEP;
-    mapping(address => uint256) internal _usedNonces;
-    mapping(address => uint256) internal _lockTimes;
+    // EIP712
+    string public constant version = "1";
+    bytes32 public immutable DOMAIN_SEPARATOR;
+    // bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address holder,address spender,uint256 nonce,uint256 expiry,bool allowed)");
+    bytes32 public constant PERMIT_TYPEHASH = 0xea2aa0a1be11a07ed86d755c93467f4f82362b452371d1ba94d1715123511acb;
+
+    mapping(address => uint256) public nonces;
+    mapping(address => uint256) public unlockTimes;
 
     event BalanceLocked(address indexed account, uint256 unlockTime);
 
-    constructor(uint256 flashMintMax_, uint192 flashBorrowRate_)
-        FlashMintERC20(
-            "Crispy.finance governance & utility token",
-            "CRUNCH",
-            flashMintMax_,
-            flashBorrowRate_
-        )
+    constructor()
+        ERC20("Crispy.finance governance & utility token", "CRSPY")
+        ERC20Capped(HARD_CAP)
+        ERC20Burnable()
         Ownable()
     {
-        bytes32 domainSeparator = keccak256(abi.encode(name(), address(this)));
-        APPROVE_SEP = keccak256(abi.encode(domainSeparator, approve.selector));
+        uint256 chainId_;
+        assembly {
+            chainId_ := chainid()
+        }
+        DOMAIN_SEPARATOR = keccak256(abi.encode(
+            //keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"), 
+            0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
+            keccak256(bytes(name())),
+            keccak256(bytes(version)),
+            chainId_,
+            address(this)
+        ));
     }
 
     function lockBalance(uint256 unlockTime) external {
-        require(unlockTime > _lockTimes[msg.sender], "CRUNCH: Invalid unlock time");
-        require(unlockTime > block.timestamp, "CRUNCH: Unlock time passed");
+        require(unlockTime > unlockTimes[msg.sender], "CRSPY: Invalid unlock time");
+        require(unlockTime > block.timestamp, "CRSPY: Unlock time passed");
 
-        _lockTimes[msg.sender] = unlockTime;
+        unlockTimes[msg.sender] = unlockTime;
         emit BalanceLocked(msg.sender, unlockTime);
-    }
-
-    function approveWithSignature(
-        uint256 nonce,
-        uint256 expiry,
-        address owner,
-        address spender,
-        uint256 amount,
-        bytes memory signature
-    )
-        external
-    {
-        require(nonce == _usedNonces[owner], "CRUNCH: Invalid nonce");
-        require(expiry <= block.timestamp, "CRUNCH: allowance expired");
-
-        bytes32 approveHash = getApproveHash(
-            nonce,
-            expiry,
-            owner,
-            spender,
-            amount
-        );
-
-        require(
-            owner == approveHash.toEthSignedMessageHash().recover(signature),
-            'CRUNCH: Invalid signature'
-        );
-
-        _approve(owner, spender, amount);
-        _usedNonces[owner]++;
-    }
-
-    function setFlashMintMax(uint192 flashMintMax_) external onlyOwner {
-        _setFlashMintMax(flashMintMax_);
-    }
-
-    function setFlashBorrowRate(uint192 flashBorrowRate_) external onlyOwner {
-        _setFlashBorrowRate(flashBorrowRate_);
     }
 
     function mint(address recipient, uint256 amount) external onlyOwner {
         _mint(recipient, amount);
     }
 
-    function getUnlockTime(address account) public view returns (uint256) {
-        return _lockTimes[account];
-    }
-
-    function getUsedNonces(address account) public view returns (uint256) {
-        return _usedNonces[account];
-    }
-
-    function getApproveHash(
+    function permit(
+        address holder,
+        address spender,
         uint256 nonce,
         uint256 expiry,
-        address owner,
+        bool allowed,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
+        external
+    {
+        bytes32 digest = getPermitDigest(holder, spender, nonce, expiry, allowed);
+        require(holder == ecrecover(digest, v, r, s), "CRSPY: invalid permit");
+        require(expiry == 0 || block.timestamp <= expiry, "CRSPY: permit expired");
+        require(nonce == nonces[holder]++, "CRSPY: invalid nonce");
+
+        _approve(holder, spender, allowed ? type(uint256).max : 0);
+    }
+
+    function getPermitDigest(
+        address holder,
         address spender,
-        uint256 amount
+        uint256 nonce,
+        uint256 expiry,
+        bool allowed
     )
         public
-        view
-        returns (bytes32)
+        pure
+        returns(bytes32)
     {
+        bytes32 permitDigest = keccak256(abi.encode(
+            PERMIT_TYPEHASH,
+            holder,
+            spender,
+            nonce,
+            expiry,
+            allowed
+        ));
         return keccak256(abi.encodePacked(
-            APPROVE_SEP, nonce, expiry, owner, spender, amount
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            permitDigest
         ));
     }
 
-    function _mint(address account, uint256 amount) internal override {
-        require(
-            totalSupply().add(amount) <= hardCap,
-            "CRUNCH: Minting beyond hard cap"
-        );
-        super._mint(account, amount);
-    }
-
     function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal override
+        internal
+        override(ERC20, ERC20Capped)
     {
         super._beforeTokenTransfer(from, to, amount);
-        require(block.timestamp >= getUnlockTime(from), "CRUNCH: Balance locked");
+        require(block.timestamp >= unlockTimes[from], "CRSPY: Balance locked");
     }
 }
