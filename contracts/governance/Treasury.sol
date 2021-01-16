@@ -26,7 +26,7 @@ contract Treasury
         external
         onlyOwner
     {
-        (bool success,) = dest.call{ value: value }(callData);
+        (bool success,) = destination.call{ value: value }(callData);
         require(success);
     }
 
