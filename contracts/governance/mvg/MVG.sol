@@ -6,10 +6,7 @@ import "../../ico/CrispyToken.sol";
 import "../Treasury.sol";
 
 /*
-  MVG (Minimum Viable Governance)
-
-  minimal implementation of a governance mechanism to govern the community
-  treasury
+    MVG (Minimum Viable Governance)
 */
 contract MVG {
     using SafeMath for uint256;
@@ -17,146 +14,195 @@ contract MVG {
     CrispyToken public constant CRISPY_TOKEN = CrispyToken(/* CRUNCH address */ address(0));
     Treasury public constant TREASURY = Treasury(/* Treasury address */ address(0));
 
-    uint256 public constant VOTE_PERIOD = 7 days;
-
     uint256 public constant ONE = 100000;
-    uint256 public constant ACTION_ACTIVATION_THRESHHOLD = 1000; // 1%
-    uint256 public constant ACTION_ACTIVATION_TAX = 800; // 0.8%
-    uint256 public constant ACTION_ACCEPTANCE_THRESHHOLD = 60000; // 60%
+
+    uint256 public constant ACTIVATION_THRESHHOLD = 6000; // 6% of available supply
+    uint256 public constant ACTIVATION_TAX = 5000; // 5% of ACTIVATION_THRESHHOLD
+
+    uint256 public constant VOTE_PERIOD = 7 days;
+    uint256 public constant ACCEPTANCE_THRESHHOLD = 60000; // 60%
+    uint256 public constant FINISH_REWARD = 1000; // 1% of ACTIVATION_TAX
+
+    bytes public callData;
+    uint256 public activatedOn;
+    bool public finished;
+    uint256 public finishReward;
+    uint256 public actionNonce;
 
     enum Vote { EMPTY, FOR, AGAINST }
-
     struct Voter {
-        Vote vote;
         uint256 votesPlaced;
+        uint256 lastActionNonce;
+        Vote vote;
     }
-    event Voted(
-        bytes32 indexed actionId,
-        address indexed voter,
-        uint256 voteCount,
-        Vote vote
+
+    mapping(Vote => uint256) public voteCount;
+    mapping(address => Voter) public voters;
+
+    event ActionInitiated(
+        bytes32 indexed callDataHash,
+        uint256 indexed actionNonce,
+        uint256 activatedOn,
+        uint256 votingEndsOn,
+        bytes callData
     );
-    event ActionVotedOn(
-        bytes32 indexed actionId,
-        uint256 fromAgainst,
-        uint256 fromFor,
-        uint256 toAgainst,
-        uint256 toFor
+
+    event ActionFinished(
+        bytes32 indexed callDataHash,
+        uint256 indexed actionNonce,
+        uint256 activatedOn,
+        uint256 votingEndedOn,
+        uint256 votesFor,
+        uint256 votesAgainst,
+        bytes callData,
+        bool executed,
+        bool successfullyExecuted
     );
 
-    struct Action {
-        bytes callData;
-        uint256 activated;
-        bool finished;
-        mapping(Vote => uint256) votes;
-        mapping(address => Voter) voters;
-    }
-    event ActionCreated(bytes32 indexed actionId);
-    event ActionActivated(bytes32 indexed actionId, uint256 activatedTimestamp);
-    event ActionTerminated(bytes32 indexed actionId, bool executed);
+    event VoteChanged(
+        bytes32 indexed callDataHash,
+        uint256 indexed actionNonce,
+        Vote vote,
+        uint256 voteCountBefore,
+        uint256 voteCountAfter
+    );
 
-    mapping(bytes32 => Action) internal _actions;
-    mapping(bytes32 => uint256) internal _nonces;
-
-    constructor() { }
-
-    modifier watchVotes(bytes32 actionId) {
-        uint256 fromAgainst = _actions[actionId].votes[Vote.AGAINST];
-        uint256 fromFor = _actions[actionId].votes[Vote.FOR];
-        _;
-        uint256 toAgainst = _actions[actionId].votes[Vote.AGAINST];
-        uint256 toFor = _actions[actionId].votes[Vote.FOR];
-        emit ActionVotedOn(actionId, fromAgainst, fromFor, toAgainst, toFor);
+    constructor() {
+        finished = true;
     }
 
-    modifier onlyWithExistingAction(bytes32 actionId) {
-        require(_actions[actionId].callData.length > 0, "MVG: Action not found");
-        _;
-    }
-
-    function createAction(bytes memory callData) external returns(bytes32) {
+    function initiateAction(bytes calldata callData_) external {
         require(callData.length > 0, "MVG: Cannot be empty call");
-        bytes32 callId = keccak256(callData);
-        uint256 newNonce = _nonces[callId]++;
-        bytes32 actionId = keccak256(abi.encodePacked(callId, newNonce));
-
-        _actions[actionId].callData = callData;
-        emit ActionCreated(actionId);
-
-        return actionId;
-    }
-
-    function activateAction(bytes32 actionId)
-        external
-        onlyWithExistingAction(actionId)
-    {
-        require(!getActionActivated(actionId), "MVG: Action already activated");
-        uint256 activationThreshhold =
-            _fracMul(totalAvailableVotes(), ACTION_ACTIVATION_THRESHHOLD);
+        require(finished, "MVG: Previous action not done");
+        uint256 activationThreshhold = _fracMul(totalAvailableVotes(), ACTIVATION_THRESHHOLD);
         require(
             CRISPY_TOKEN.balanceOf(msg.sender) >= activationThreshhold,
             "MVG: Below capital requirement"
         );
 
-        CRISPY_TOKEN.transferFrom(
-            msg.sender,
-            address(TREASURY),
-            _fracMul(activationThreshhold, ACTION_ACTIVATION_TAX)
-        );
+        _tax(activationThreshhold);
 
-        uint256 actionActivated = block.timestamp;
-        _actions[actionId].activated = actionActivated;
-        emit ActionActivated(actionId, actionActivated);
+        callData = callData_;
+        uint256 activatedOn_ = block.timestamp;
+
+        activatedOn = activatedOn_;
+        finished = false;
+        voteCount[Vote.FOR] = 0;
+        voteCount[Vote.AGAINST] = 0;
+
+        emit ActionInitiated(
+            keccak256(callData_),
+            ++actionNonce,
+            activatedOn_,
+            activatedOn_.add(VOTE_PERIOD),
+            callData_
+        );
     }
 
-    function voteOn(bytes32 actionId, Vote vote)
-        external
-        onlyWithExistingAction(actionId)
-    {
-        require(getActionActivated(actionId), "MVG: Action not activated yet");
-        uint256 votingEnd = getVotingEnd(actionId);
-        require(votingEnd > block.timestamp, "MVG: Voting has ended");
-        require(
-            votingEnd <= CRISPY_TOKEN.getUnlockTime(msg.sender),
-            "MVG: Must lock tokens to vote"
-        );
+    function vote(Vote newVote) external {
+        if (checkDone()) return;
 
-        _vote(actionId, CRISPY_TOKEN.balanceOf(msg.sender), vote);
-    }
+        require(newVote != Vote.EMPTY, "MVG: Cannot place empty vote");
+        uint256 votesAvailable = votingPowerOf(msg.sender);
+        require(votesAvailable > 0, "MVG: Cannot vote");
 
-    function terminateAction(bytes32 actionId)
-        external
-        onlyWithExistingAction(actionId)
-    {
-        require(
-            getVotingEnd(actionId) <= block.timestamp,
-            "MVG: Voting hasn't ended yet"
-        );
+        Voter storage voter = voters[msg.sender];
 
-        Action storage action = _actions[actionId];
+        uint256 oldVotesPlaced;
+        Vote oldVote;
 
-        uint256 votesFor = action.votes[Vote.FOR];
-        uint256 votesAgainst = action.votes[Vote.AGAINST];
-        uint256 voteForFraction = _fracDiv(
-            votesFor,
-            votesFor.add(votesAgainst)
-        );
+        if (voter.lastActionNonce == actionNonce) {
+            oldVotesPlaced = voter.votesPlaced;
+            oldVote = voter.vote;
+        } else {
+            voter.lastActionNonce = actionNonce;
+        }
 
-        action.finished = true;
-        // if (voteForFraction >)
-    }
+        bytes32 callDataHash = keccak256(callData);
 
-    function getActionActivated(bytes32 actionId) public view returns(bool) {
-        return _actions[actionId].activated > 0;
-    }
+        if (newVote != oldVote) {
+            voter.vote = newVote;
+            voteCount[newVote] = voteCount[newVote].add(votesAvailable);
 
-    function getVotingEnd(bytes32 actionId) public view returns(uint256) {
-        return _actions[actionId].activated.add(VOTE_PERIOD);
+            if (oldVote == Vote.EMPTY) {
+                voter.votesPlaced = votesAvailable;
+            } else {
+                voteCount[oldVote] = voteCount[oldVote].sub(oldVotesPlaced);
+                if (votesAvailable > oldVotesPlaced) {
+                    voter.votesPlaced = votesAvailable;
+                }
+            }
+        } else {
+            require(votesAvailable > oldVotesPlaced, "MVG: Can only increase vote");
+
+            voter.votesPlaced = votesAvailable;
+            uint256 newVotes = votesAvailable.sub(oldVotesPlaced);
+            voteCount[newVote] = voteCount[newVote].add(newVotes);
+        }
     }
 
     function totalAvailableVotes() public view returns(uint256) {
         uint256 treasuryReserves = CRISPY_TOKEN.balanceOf(address(TREASURY));
         return CRISPY_TOKEN.totalSupply().sub(treasuryReserves);
+    }
+
+    function votingPowerOf(address account) public view returns(uint256) {
+        return voteEnd() < CRISPY_TOKEN.unlockTimes(account)
+            ? CRISPY_TOKEN.balanceOf(msg.sender)
+            : 0;
+    }
+
+    function voteEnd() public view returns(uint256) {
+        return activatedOn.add(VOTE_PERIOD);
+    }
+
+    function checkDone() public returns(bool) {
+        require(!finished, "MVG: No Action currently active");
+
+        if (block.timestamp < voteEnd()) {
+            return false;
+        }
+
+        _executeWill();
+        CRISPY_TOKEN.transfer(msg.sender, finishReward);
+        return true;
+    }
+
+    function _executeWill() internal {
+        uint256 votesFor = voteCount[Vote.FOR];
+        uint256 votesAgainst = voteCount[Vote.AGAINST];
+
+        uint256 votesForFraction = _fracDiv(votesFor, votesAgainst.add(votesFor));
+
+        bool accepted = votesForFraction >= ACCEPTANCE_THRESHHOLD;
+        bool successfullyExecuted = false;
+
+        if (accepted) {
+            (successfullyExecuted,) = address(TREASURY).call(callData);
+        }
+
+        finished = true;
+        emit ActionFinished(
+            keccak256(callData),
+            actionNonce,
+            activatedOn,
+            block.timestamp,
+            votesFor,
+            votesAgainst,
+            callData,
+            accepted,
+            successfullyExecuted
+        );
+    }
+
+    function _tax(uint256 amountToTax) internal {
+        uint256 totalTax = _fracMul(amountToTax, ACTIVATION_TAX);
+        uint256 finishReward_ = _fracMul(totalTax, FINISH_REWARD);
+
+        CRISPY_TOKEN.transferFrom(msg.sender, address(TREASURY), totalTax.sub(finishReward_));
+        CRISPY_TOKEN.transferFrom(msg.sender, address(this), finishReward_);
+
+        finishReward = finishReward_;
     }
 
     function _fracMul(uint256 intX, uint256 fracY) internal pure returns(uint256) {
@@ -165,48 +211,5 @@ contract MVG {
 
     function _fracDiv(uint256 intX, uint256 intY) internal pure returns(uint256) {
         return intX.mul(ONE).div(intY);
-    }
-
-    function _oppositeVote(Vote vote) internal pure returns(Vote) {
-        if (vote == Vote.AGAINST) return Vote.FOR;
-        if (vote == Vote.FOR) return Vote.AGAINST;
-        return Vote.EMPTY;
-    }
-
-    function _vote(
-        bytes32 actionId,
-        uint256 voteCount,
-        Vote newVote
-    )
-        internal
-        watchVotes(actionId)
-    {
-        require(newVote != Vote.EMPTY, "MVG: Cannot place empty vote");
-        emit Voted(actionId, msg.sender, voteCount, newVote);
-
-        Action storage action = _actions[actionId];
-        Voter storage voter = action.voters[msg.sender];
-        Vote oldVote = voter.vote;
-
-
-        if (oldVote != newVote) {
-            voter.vote = newVote;
-            action.votes[newVote] = action.votes[newVote].add(voteCount);
-
-            if (oldVote == Vote.EMPTY) {
-                voter.votesPlaced = voteCount;
-            } else {
-                action.votes[oldVote] = action.votes[oldVote].sub(voter.votesPlaced);
-                if (voteCount > voter.votesPlaced) {
-                    voter.votesPlaced = voteCount;
-                }
-            }
-        } else {
-            require(voteCount > voter.votesPlaced, "MVG: Can only increase vote");
-
-            voter.votesPlaced = voteCount;
-            uint256 newVotes = voteCount.sub(voter.votesPlaced);
-            action.votes[newVote] = action.votes[newVote].add(newVotes);
-        }
     }
 }

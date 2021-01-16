@@ -2,15 +2,11 @@
 pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Capped.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract CrispyToken is ERC20, ERC20Capped, ERC20Burnable, Ownable {
-    using SafeMath for uint256;
-    using ECDSA for bytes32;
 
     uint256 public constant HARD_CAP = 400 * 1e6 * 1e18; // 400 million coins
 
@@ -85,7 +81,7 @@ contract CrispyToken is ERC20, ERC20Capped, ERC20Burnable, Ownable {
         bool allowed
     )
         public
-        pure
+        view
         returns(bytes32)
     {
         bytes32 permitDigest = keccak256(abi.encode(
