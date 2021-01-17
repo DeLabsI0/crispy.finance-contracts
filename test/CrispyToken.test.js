@@ -1,8 +1,7 @@
 const { accounts, contract } = require('@openzeppelin/test-environment')
-const { convertFloatToUQInt } = require('safe-qmath/utils')
-const { ZERO, bnToWei } = require('./utils')
+const { ZERO } = require('./utils')
 const { BN } = require('bn.js')
-const [admin1] = accounts
+const [admin1, user1] = accounts
 
 const chai = require('chai')
 chai.use(require('chai-bn')(BN))
@@ -12,11 +11,7 @@ const CrispyToken = contract.fromArtifact('CrispyToken')
 
 describe('CrispyToken', () => {
   beforeEach(async () => {
-    this.maxSupplyWithLoan = bnToWei('10000000000')
-    this.flashLoanInterest = convertFloatToUQInt(0.0002)
-    this.crispyToken = await CrispyToken.new(this.maxSupplyWithLoan, this.flashLoanInterest, {
-      from: admin1
-    })
+    this.crispyToken = await CrispyToken.new({ from: admin1 })
   })
   describe('deploy conditions', () => {
     it('makes deployer owner', async () => {
@@ -27,5 +22,8 @@ describe('CrispyToken', () => {
 
       expect(startSupply).to.be.bignumber.equal(ZERO)
     })
+  })
+  describe('basic ERC20 functions', () => {
+    it('can transf')
   })
 })

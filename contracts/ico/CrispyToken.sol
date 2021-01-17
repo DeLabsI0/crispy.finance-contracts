@@ -70,7 +70,8 @@ contract CrispyToken is ERC20, ERC20Capped, ERC20Burnable, Ownable {
         require(expiry == 0 || block.timestamp <= expiry, "CRSPY: permit expired");
         require(nonce == nonces[holder]++, "CRSPY: invalid nonce");
 
-        _approve(holder, spender, allowed ? type(uint256).max : 0);
+        uint256 allowance = allowed ? type(uint256).max : 0;
+        _approve(holder, spender, allowance);
     }
 
     function getPermitDigest(
