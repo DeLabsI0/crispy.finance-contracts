@@ -41,7 +41,7 @@ contract CrispyToken is ERC20, ERC20Capped, ERC20Burnable, Ownable {
         ));
     }
 
-    function lockBalance(uint256 unlockTime) external {
+    function lockBalanceUntil(uint256 unlockTime) external {
         require(unlockTime > unlockTimes[msg.sender], "CRSPY: Invalid unlock time");
         require(unlockTime > block.timestamp, "CRSPY: Unlock time passed");
 
