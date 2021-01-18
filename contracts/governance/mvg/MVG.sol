@@ -118,7 +118,7 @@ contract MVG {
             voter.lastActionNonce = actionNonce;
         }
 
-        bytes32 callDataHash = keccak256(callData);
+        //bytes32 callDataHash = keccak256(callData);
 
         if (newVote != oldVote) {
             voter.vote = newVote;

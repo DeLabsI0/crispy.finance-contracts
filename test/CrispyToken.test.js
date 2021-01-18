@@ -1,7 +1,7 @@
 const { accounts, contract } = require('@openzeppelin/test-environment')
-const { expectEvent, expectRevert, constants, time } = require('@openzeppelin/test-helpers')
+const { expectEvent, expectRevert, constants, time, ether } = require('@openzeppelin/test-helpers')
 const { ZERO_ADDRESS } = constants
-const { ZERO, bnToWei } = require('./utils')
+const { ZERO } = require('./utils')
 const { BN } = require('bn.js')
 const [admin1, admin2, user1, user2, attacker1] = accounts
 
@@ -35,7 +35,7 @@ describe('CrispyToken', () => {
   })
   describe('admin functionality', () => {
     it('can only mint tokens if owner', async () => {
-      const mintAmount = bnToWei('34.5')
+      const mintAmount = ether('34.5')
       const receipt = await this.crispyToken.mint(user1, mintAmount, { from: admin1 })
       expectEvent(receipt, 'Transfer', {
         from: ZERO_ADDRESS,
@@ -47,17 +47,17 @@ describe('CrispyToken', () => {
       expect(balAfterMint).to.be.bignumber.equal(mintAmount)
 
       await expectRevert(
-        this.crispyToken.mint(attacker1, bnToWei('100'), { from: attacker1 }),
+        this.crispyToken.mint(attacker1, ether('100'), { from: attacker1 }),
         'Ownable: caller is not the owner'
       )
     })
     it('cannot mint beyond hard cap', async () => {
-      expect(this.HARD_CAP).to.be.bignumber.equal(bnToWei(400 * 1e6))
+      expect(this.HARD_CAP).to.be.bignumber.equal(ether(400 * 1e6))
 
-      const initialInjection = bnToWei(390 * 1e6)
+      const initialInjection = ether(390 * 1e6)
       await this.crispyToken.mint(admin2, initialInjection, { from: admin1 })
 
-      const overCapInjection = bnToWei(50 * 1e6)
+      const overCapInjection = ether(50 * 1e6)
       const totalAttemptedInjection = initialInjection.add(overCapInjection)
       expect(totalAttemptedInjection).to.be.bignumber.above(this.HARD_CAP)
 
@@ -97,14 +97,14 @@ describe('CrispyToken', () => {
       expect(await this.crispyToken.unlockTimes(user1)).to.be.bignumber.equal(this.unlockTime)
     })
     it('allows timelocked accounts to receive tokens', async () => {
-      const mintAmount = bnToWei('43')
+      const mintAmount = ether('43')
       await this.crispyToken.mint(user2, mintAmount, { from: admin1 })
 
       const receipt = await this.crispyToken.transfer(user1, mintAmount, { from: user2 })
       expectEvent(receipt, 'Transfer', { from: user2, to: user1, value: mintAmount })
     })
     it('prevents locked users from transferring', async () => {
-      const user1Bal = bnToWei('17')
+      const user1Bal = ether('17')
       await this.crispyToken.mint(user1, user1Bal, { from: admin1 })
 
       await expectRevert(
@@ -131,7 +131,7 @@ describe('CrispyToken', () => {
       )
     })
     it('can moves tokens after timelock expiry', async () => {
-      const user1Bal = bnToWei('17')
+      const user1Bal = ether('17')
       await this.crispyToken.mint(user1, user1Bal, { from: admin1 })
       await time.increaseTo(this.unlockTime)
 

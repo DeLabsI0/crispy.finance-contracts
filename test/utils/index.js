@@ -1,8 +1,10 @@
 const { BN } = require('bn.js')
-const { web3 } = require('@openzeppelin/test-environment')
 
 const ZERO = new BN('0')
-const bnToWei = (x) => new BN(web3.utils.toWei(x.toString()))
 const bnSum = (...nums) => nums.reduce((x, y) => x.add(y), ZERO)
+const encodeFunctionCall = (contract, method, args) => {
+  const data = contract.contract.methods[method](...args).encodeABI()
+  console.log('data: ', data)
+}
 
-module.exports = { ZERO, bnToWei, bnSum }
+module.exports = { ZERO, bnSum, encodeFunctionCall }
