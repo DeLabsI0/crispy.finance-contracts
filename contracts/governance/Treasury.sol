@@ -12,9 +12,7 @@ contract Treasury
        ERC721Holder,
        ERC1155Holder
 {
-    constructor(address newOwner) Ownable() {
-        transferOwnership(newOwner);
-    }
+    constructor() Ownable() { }
 
     receive() payable external { }
 

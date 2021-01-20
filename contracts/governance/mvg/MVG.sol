@@ -7,12 +7,19 @@ import "../Treasury.sol";
 
 /*
     MVG (Minimum Viable Governance)
+
+    Simple governance contract governing the treasury. Can only send arbitrary
+    transactions to a single address (in this case the treasury). Only one
+    action can be created and voted on at a time.
+
+    In order to upgrade the governance a proposal needs to be passed to transfer
+    ownership of the treasury to a new governance contract.
 */
 contract MVG {
     using SafeMath for uint256;
 
-    CrispyToken public constant CRISPY_TOKEN = CrispyToken(/* CRUNCH address */ address(0));
-    Treasury public constant TREASURY = Treasury(/* Treasury address */ address(0));
+    CrispyToken public immutable CRISPY_TOKEN;
+    Treasury public immutable TREASURY;
 
     uint256 public constant ONE = 100000;
 
@@ -60,6 +67,7 @@ contract MVG {
     );
 
     event VoteChanged(
+        address indexed account,
         bytes32 indexed callDataHash,
         uint256 indexed actionNonce,
         Vote vote,
@@ -67,20 +75,22 @@ contract MVG {
         uint256 voteCountAfter
     );
 
-    constructor() {
+    constructor(address crispyToken, address payable treasury) {
         finished = true;
+        CRISPY_TOKEN = CrispyToken(crispyToken);
+        TREASURY = Treasury(treasury);
     }
 
     function initiateAction(bytes calldata callData_) external {
-        require(callData.length > 0, "MVG: Cannot be empty call");
+        require(callData_.length > 0, "MVG: Cannot be empty call");
         require(finished, "MVG: Previous action not done");
-        uint256 activationThreshhold = _fracMul(totalAvailableVotes(), ACTIVATION_THRESHHOLD);
+        uint256 activationThreshhold_ = activationThreshhold();
         require(
-            CRISPY_TOKEN.balanceOf(msg.sender) >= activationThreshhold,
+            CRISPY_TOKEN.balanceOf(msg.sender) >= activationThreshhold_,
             "MVG: Below capital requirement"
         );
 
-        _tax(activationThreshhold);
+        _tax(activationThreshhold_);
 
         callData = callData_;
         uint256 activatedOn_ = block.timestamp;
@@ -104,7 +114,7 @@ contract MVG {
 
         require(newVote != Vote.EMPTY, "MVG: Cannot place empty vote");
         uint256 votesAvailable = votingPowerOf(msg.sender);
-        require(votesAvailable > 0, "MVG: Cannot vote");
+        require(votesAvailable > 0, "MVG: No voting power");
 
         Voter storage voter = voters[msg.sender];
 
@@ -118,15 +128,32 @@ contract MVG {
             voter.lastActionNonce = actionNonce;
         }
 
-        //bytes32 callDataHash = keccak256(callData);
+        bytes32 callDataHash = keccak256(callData);
 
         if (newVote != oldVote) {
             voter.vote = newVote;
             voteCount[newVote] = voteCount[newVote].add(votesAvailable);
 
+            emit VoteChanged(
+                msg.sender,
+                callDataHash,
+                actionNonce,
+                newVote,
+                uint256(0),
+                votesAvailable
+            );
+
             if (oldVote == Vote.EMPTY) {
                 voter.votesPlaced = votesAvailable;
             } else {
+                emit VoteChanged(
+                    msg.sender,
+                    callDataHash,
+                    actionNonce,
+                    oldVote,
+                    oldVotesPlaced,
+                    uint256(0)
+                );
                 voteCount[oldVote] = voteCount[oldVote].sub(oldVotesPlaced);
                 if (votesAvailable > oldVotesPlaced) {
                     voter.votesPlaced = votesAvailable;
@@ -138,6 +165,15 @@ contract MVG {
             voter.votesPlaced = votesAvailable;
             uint256 newVotes = votesAvailable.sub(oldVotesPlaced);
             voteCount[newVote] = voteCount[newVote].add(newVotes);
+
+            emit VoteChanged(
+                msg.sender,
+                callDataHash,
+                actionNonce,
+                newVote,
+                oldVotesPlaced,
+                votesAvailable
+            );
         }
     }
 
@@ -168,13 +204,17 @@ contract MVG {
         return true;
     }
 
+    function activationThreshhold() public view returns(uint256) {
+        return _fracMul(totalAvailableVotes(), ACTIVATION_THRESHHOLD);
+    }
+
     function _executeWill() internal {
         uint256 votesFor = voteCount[Vote.FOR];
         uint256 votesAgainst = voteCount[Vote.AGAINST];
 
         uint256 votesForFraction = _fracDiv(votesFor, votesAgainst.add(votesFor));
 
-        bool accepted = votesForFraction >= ACCEPTANCE_THRESHHOLD;
+        bool accepted = votesFor >= activationThreshhold() && votesForFraction >= ACCEPTANCE_THRESHHOLD;
         bool successfullyExecuted = false;
 
         if (accepted) {

@@ -1,7 +1,7 @@
 const { accounts, contract } = require('@openzeppelin/test-environment')
-const { expectEvent, expectRevert, constants, time, ether } = require('@openzeppelin/test-helpers')
+const { expectEvent, expectRevert, constants, time } = require('@openzeppelin/test-helpers')
 const { ZERO_ADDRESS } = constants
-const { ZERO } = require('./utils')
+const { ZERO, ether } = require('./utils/general')
 const { BN } = require('bn.js')
 const [admin1, admin2, user1, user2, attacker1] = accounts
 
