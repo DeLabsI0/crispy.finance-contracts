@@ -62,6 +62,10 @@ describe('LockedTokens', () => {
     expectEvent(receipt, 'Transfer', { from: user1, to: user2, tokenId })
 
     await time.increaseTo(unlockTime)
+    await expectRevert(
+      this.tokenLocker.unlockTokens(tokenId, { from: user1 }),
+      'CR3T: Must be owner to redeem'
+    )
 
     receipt = await this.tokenLocker.unlockTokens(tokenId, { from: user2 })
     expectEvent(receipt, 'Transfer', { from: user2, to: ZERO_ADDRESS, tokenId })
