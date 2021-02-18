@@ -25,17 +25,7 @@ contract LockedTokens is ERC721, Ownable {
     function lockTokens(address token, uint256 amount, uint256 unlockTime)
         external
     {
-        TransferHelper.safeTransferFrom(
-            token,
-            msg.sender,
-            address(this),
-            amount,
-            "CR3T: Deposit failed"
-        );
-        uint256 tokenId = uint256(keccak256(
-            abi.encode(token, _tokenNonce[token]++)
-        ));
-        _lockTokens(tokenId, token, amount, unlockTime, msg.sender);
+        _lockTokens(token, amount, unlockTime, msg.sender);
     }
 
     function lockTokensFor(
@@ -46,17 +36,7 @@ contract LockedTokens is ERC721, Ownable {
     )
         external
     {
-        TransferHelper.safeTransferFrom(
-            token,
-            msg.sender,
-            address(this),
-            amount,
-            "CR3T: Deposit failed"
-        );
-        uint256 tokenId = uint256(keccak256(
-            abi.encode(token, _tokenNonce[token]++)
-        ));
-        _lockTokens(tokenId, token, amount, unlockTime, recipient);
+        _lockTokens(token, amount, unlockTime, recipient);
     }
 
     function spreadLockTokens(
@@ -79,7 +59,13 @@ contract LockedTokens is ERC721, Ownable {
             uint256 tokenId = uint256(keccak256(
                 abi.encode(token, curNonce + i)
             ));
-            _lockTokens(tokenId, token, amounts[i], unlockTimes[i], recipients[i]);
+            _recordLock(
+                tokenId,
+                token,
+                amounts[i],
+                unlockTimes[i],
+                recipients[i]
+            );
         }
         TransferHelper.safeTransferFrom(
             token,
@@ -130,7 +116,38 @@ contract LockedTokens is ERC721, Ownable {
         unlockTime = _tokenizedLocks[tokenId].unlockTime;
     }
 
+    function getNonce(address token) public view returns(uint256) {
+        return _tokenNonce[token];
+    }
+
+    function genTokenId(address token, uint256 nonce)
+        public
+        view
+        returns(uint256)
+    {
+        return uint256(keccak256(abi.encode(token, nonce)));
+    }
+
     function _lockTokens(
+        address token,
+        uint256 amount,
+        uint256 unlockTime,
+        address recipient
+    )
+        internal
+    {
+        TransferHelper.safeTransferFrom(
+            token,
+            msg.sender,
+            address(this),
+            amount,
+            "CR3T: Deposit failed"
+        );
+        uint256 tokenId = genTokenId(token, _tokenNonce[token]++);
+        _recordLock(tokenId, token, amount, unlockTime, recipient);
+    }
+
+    function _recordLock(
         uint256 tokenId,
         address token,
         uint256 amount,
