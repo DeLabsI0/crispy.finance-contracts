@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../lib/TransferHelper.sol";
 
-contract LockedTokens is ERC721 {
+contract LockedTokens is ERC721, Ownable {
     struct TokenizedLock {
         address token;
         uint256 amount;
@@ -95,7 +95,7 @@ contract LockedTokens is ERC721 {
         require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to redeem");
         TokenizedLock memory tokenizedLock = _tokenizedLocks[tokenId];
         require(
-            tokenizedLock.unlockTime >= block.timestamp,
+            tokenizedLock.unlockTime <= block.timestamp,
             "CR3T: Tokens not unlocked yet"
         );
         TransferHelper.safeTransfer(
@@ -114,6 +114,20 @@ contract LockedTokens is ERC721 {
     function setTokenURI(uint256 tokenId, string memory _tokenURI) external {
         require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to redeem");
         _setTokenURI(tokenId, _tokenURI);
+    }
+
+    function getLockInfo(uint256 tokenId)
+        public
+        view
+        returns(
+            address token,
+            uint256 amount,
+            uint256 unlockTime
+        )
+    {
+        token = _tokenizedLocks[tokenId].token;
+        amount = _tokenizedLocks[tokenId].amount;
+        unlockTime = _tokenizedLocks[tokenId].unlockTime;
     }
 
     function _lockTokens(
