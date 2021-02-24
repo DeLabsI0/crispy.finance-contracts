@@ -14,7 +14,7 @@ contract LockedTokens is ERC721, Ownable {
         uint256 unlockTime;
     }
 
-    mapping(address => uint256) internal _tokenNonce;
+    uint256 public totalLocksCreated;
     mapping(uint256 => TokenizedLock) internal _tokenizedLocks;
 
     constructor()
@@ -52,17 +52,15 @@ contract LockedTokens is ERC721, Ownable {
             unlockTimes.length == recipients.length,
             "CR3T: Input lengths do not match"
         );
-        uint256 curNonce = _tokenNonce[token];
+        uint256 curNonce = totalLocksCreated;
         uint256 totalToDeposit = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
-            totalToDeposit = SafeMath.add(totalToDeposit, amounts[i]);
-            uint256 tokenId = uint256(keccak256(
-                abi.encode(token, curNonce + i)
-            ));
+            uint256 amount = amounts[i];
+            totalToDeposit = SafeMath.add(totalToDeposit, amount);
             _recordLock(
-                tokenId,
+                curNonce + i,
                 token,
-                amounts[i],
+                amount,
                 unlockTimes[i],
                 recipients[i]
             );
@@ -74,11 +72,12 @@ contract LockedTokens is ERC721, Ownable {
             totalToDeposit,
             "CR3T: Deposit failed"
         );
-        _tokenNonce[token] = curNonce + amounts.length;
+        totalLocksCreated += amounts.length;
     }
 
     function unlockTokens(uint256 tokenId) external {
-        require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to redeem");
+        require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to unlock");
+        _burn(tokenId);
         TokenizedLock memory tokenizedLock = _tokenizedLocks[tokenId];
         require(
             tokenizedLock.unlockTime <= block.timestamp,
@@ -90,16 +89,10 @@ contract LockedTokens is ERC721, Ownable {
             tokenizedLock.amount,
             "CR3T: Redeem failed"
         );
-        _burn(tokenId);
     }
 
     function setBaseURI(string memory baseURI_) external onlyOwner {
         _setBaseURI(baseURI_);
-    }
-
-    function setTokenURI(uint256 tokenId, string memory _tokenURI) external {
-        require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to redeem");
-        _setTokenURI(tokenId, _tokenURI);
     }
 
     function getLockInfo(uint256 tokenId)
@@ -114,18 +107,6 @@ contract LockedTokens is ERC721, Ownable {
         token = _tokenizedLocks[tokenId].token;
         amount = _tokenizedLocks[tokenId].amount;
         unlockTime = _tokenizedLocks[tokenId].unlockTime;
-    }
-
-    function getNonce(address token) public view returns(uint256) {
-        return _tokenNonce[token];
-    }
-
-    function genTokenId(address token, uint256 nonce)
-        public
-        view
-        returns(uint256)
-    {
-        return uint256(keccak256(abi.encode(token, nonce)));
     }
 
     function _lockTokens(
@@ -143,7 +124,7 @@ contract LockedTokens is ERC721, Ownable {
             amount,
             "CR3T: Deposit failed"
         );
-        uint256 tokenId = genTokenId(token, _tokenNonce[token]++);
+        uint256 tokenId = totalLocksCreated++;
         _recordLock(tokenId, token, amount, unlockTime, recipient);
     }
 
