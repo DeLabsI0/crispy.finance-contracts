@@ -314,5 +314,17 @@ describe('LockedTokens', () => {
       const { receipt: receipt4 } = await lock(locks)
       console.log(`(${locks}) => ${receipt4.gasUsed} (${receipt4.gasUsed / locks} gas / lock)`)
     })
+    it('unlock gas usage', async () => {
+      await this.token1.approve(this.tokenLocker.address, MAX_UINT256, { from: user1 })
+      const curTime = await time.latest()
+      const unlockTime = curTime.add(time.duration.days(1))
+      await this.tokenLocker.lockTokens(this.token1.address, ether('2'), unlockTime, {
+        from: user1
+      })
+      await time.increaseTo(unlockTime)
+
+      const { receipt } = await this.tokenLocker.unlockTokens(new BN('0'), { from: user1 })
+      console.log(`unlock lock gas usage: ${receipt.gasUsed} (${receipt.cumulativeGasUsed})`)
+    })
   })
 })

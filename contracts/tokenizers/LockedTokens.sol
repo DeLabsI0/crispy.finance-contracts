@@ -78,7 +78,7 @@ contract LockedTokens is ERC721, Ownable {
     function unlockTokens(uint256 tokenId) external {
         require(ownerOf(tokenId) == msg.sender, "CR3T: Must be owner to unlock");
         _burn(tokenId);
-        TokenizedLock memory tokenizedLock = _tokenizedLocks[tokenId];
+        TokenizedLock storage tokenizedLock = _tokenizedLocks[tokenId];
         require(
             tokenizedLock.unlockTime <= block.timestamp,
             "CR3T: Tokens not unlocked yet"
