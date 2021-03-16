@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/Math.sol";
 
 contract CliffConstantStream is Ownable {
     using SafeMath for uint256;
@@ -15,8 +14,8 @@ contract CliffConstantStream is Ownable {
     address public beneficiary;
     uint256 public toBeReleased;
     uint256 public lastRelease;
-    uint256 public cliff;
-    uint256 public vestingEnd;
+    uint256 public immutable cliff;
+    uint256 public immutable vestingEnd;
 
     event BeneficiaryUpdated(
         address indexed prevBeneficiary,
@@ -53,6 +52,16 @@ contract CliffConstantStream is Ownable {
         emit Deposit(msg.sender, amount);
     }
 
+    function sync(address recipient) external onlyBeneficiary {
+        require(block.timestamp < vestingEnd, "CS: Vesting has already ended");
+        _withdrawPending(recipient, false);
+        uint256 currentBal = token.balanceOf(address(this));
+        uint256 toBeReleased_ = toBeReleased;
+        require(toBeReleased_ < currentBal, "CS: Balance already synced up");
+        toBeReleased = currentBal;
+        emit Deposit(address(0), currentBal - toBeReleased_);
+    }
+
     function withdrawTokensTo(address recipient) external onlyBeneficiary {
         _withdrawPending(recipient, true);
     }
@@ -70,19 +79,24 @@ contract CliffConstantStream is Ownable {
     }
 
     function pendingTokens() public view returns(uint256) {
-        if (block.timestamp < cliff || toBeReleased == 0) {
+        if (block.timestamp < cliff) {
             return uint256(0);
         }
-        uint256 timeSinceLastRelease = Math.min(block.timestamp, vestingEnd).sub(lastRelease);
-        uint256 totalTime = vestingEnd.sub(lastRelease);
-        return toBeReleased.mul(timeSinceLastRelease).div(totalTime);
+        if (block.timestamp < vestingEnd) {
+            uint256 timeSinceLastRelease = block.timestamp.sub(lastRelease);
+            uint256 totalTime = vestingEnd.sub(lastRelease);
+            return toBeReleased.mul(timeSinceLastRelease).div(totalTime);
+        } else {
+            return token.balanceOf(address(this));
+        }
     }
 
     function _withdrawPending(address beneficiary_, bool revertOnFail) internal {
         uint256 pendingTokens_ = pendingTokens();
         if (pendingTokens_ > 0) {
-            lastRelease = Math.min(block.timestamp, vestingEnd);
+            lastRelease = block.timestamp;
             _withdrawTokens(beneficiary_, pendingTokens_);
+            toBeReleased = toBeReleased.sub(pendingTokens_);
         } else {
             require(!revertOnFail, "CS: No pending tokens");
         }
