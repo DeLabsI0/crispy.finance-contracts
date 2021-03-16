@@ -24,7 +24,6 @@ contract CliffConstantStream is Ownable {
     );
     event Withdraw(address indexed recipient, uint256 amount);
     event Deposit(address indexed depositor, uint256 amount);
-    event DrainBlocked();
 
     constructor(
         IERC20 token_,
