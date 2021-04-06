@@ -1,5 +1,6 @@
 const { BN } = require('bn.js')
 const { web3 } = require('@openzeppelin/test-environment')
+const { expect } = require('chai')
 const rlp = require('rlp')
 const keccak = require('keccak')
 
@@ -58,6 +59,25 @@ const trackBalance = async (token, address, setPrev = true) => {
   return balanceTracker
 }
 
+const safeBN = (val) =>
+  typeof val === 'number' ? new BN(Math.round(val).toString()) : new BN(val.toString())
+
+const bnE = (base, digits) => safeBN(base).mul(new BN('10').pow(safeBN(digits)))
+
+const expectEqualWithinPrecision = (a, b, digits = '0', errorMsg) => {
+  expectEqualWithinError(a, b, bnE('1', digits), errorMsg)
+}
+
+const expectEqualWithinFraction = (a, b, numerator, denominator, errorMsg) => {
+  const error = b.mul(numerator).div(denominator)
+  expectEqualWithinError(a, b, error, errorMsg)
+}
+
+const expectEqualWithinError = (a, b, error, errorMsg) => {
+  const diff = a.sub(b).abs()
+  expect(diff).to.be.bignumber.at.most(error, errorMsg)
+}
+
 module.exports = {
   ZERO,
   bnSum,
@@ -66,5 +86,10 @@ module.exports = {
   bnPerc,
   getDetAddr,
   getTxNonce,
-  trackBalance
+  trackBalance,
+  safeBN,
+  bnE,
+  expectEqualWithinPrecision,
+  expectEqualWithinFraction,
+  expectEqualWithinError
 }

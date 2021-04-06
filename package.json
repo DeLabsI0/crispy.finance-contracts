@@ -13,13 +13,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@openzeppelin/contracts": "^3.3.0-solc-0.7",
+    "@openzeppelin/contracts": "^4.0.0",
     "ez-staker-contracts": "^2.3.0",
     "safe-qmath": "^2.1.0"
   },
   "devDependencies": {
     "@openzeppelin/test-environment": "^0.1.9",
-    "@openzeppelin/test-helpers": "^0.5.10",
+    "@openzeppelin/test-helpers": "github:MrClottom/openzeppelin-test-helpers",
     "chai-bn": "^0.2.1",
     "eslint": "^7.16.0",
     "eslint-plugin-prettier": "^3.3.0",
