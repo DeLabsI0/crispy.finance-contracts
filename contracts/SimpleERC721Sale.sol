@@ -38,9 +38,9 @@ contract SimpleERC721Sale is Ownable, IERC721Receiver {
         uint256 tokenId,
         bytes calldata
     ) external override returns (bytes4) {
-        require(operator == msg.sender, 'Wrong sender address');
-        require(operator == tokenAddr, 'Invalid token contract');
-        require(tokenId == tokenIdToSell, 'Invalid tokenId');
+        require(operator == msg.sender, "Wrong sender address");
+        require(operator == tokenAddr, "Invalid token contract");
+        require(tokenId == tokenIdToSell, "Invalid tokenId");
 
         isActive = true;
 
@@ -48,15 +48,15 @@ contract SimpleERC721Sale is Ownable, IERC721Receiver {
     }
 
     function cancel() external onlyOwner {
-        require(isActive, 'Offer not active');
+        require(isActive, "Offer not active");
         IERC721(tokenAddr).safeTransferFrom(address(this), owner(), tokenIdToSell);
         isActive = false;
     }
 
     receive() external payable {
-        require(isActive, 'Token has not been despoited yet');
-        require(msg.value >= price, 'Insufficient funds');
-        require(buyer == address(0) || msg.sender == buyer, 'Wrong buyer');
+        require(isActive, "Token has not been despoited yet");
+        require(msg.value >= price, "Insufficient funds");
+        require(buyer == address(0) || msg.sender == buyer, "Wrong buyer");
 
         IERC721(tokenAddr).safeTransferFrom(address(this), msg.sender, tokenIdToSell);
         selfdestruct(payable(owner()));
