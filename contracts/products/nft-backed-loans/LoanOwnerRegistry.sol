@@ -51,7 +51,7 @@ contract LoanOwnerRegistry is ERC721, Ownable, ILoanOwnerRegistry {
     function registerLender(address _lender) external override {
         address loan = ILoan(msg.sender);
         require(isRegisteredLoan[loan], "LOR: Not registered loan");
-        uint256 tokenId = getRegistryTokenId(loan)
+        uint256 tokenId = getRegistryTokenId(loan);
         _safeMint(_lender, tokenId);
     }
 
