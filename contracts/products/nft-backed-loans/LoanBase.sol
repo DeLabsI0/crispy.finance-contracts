@@ -4,25 +4,20 @@ pragma solidity ^0.8.3;
 import "./ILoanBase.sol";
 
 abstract contract LoanBase is ILoanBase {
-    enum Status {
-        RUNNING,
-        COMPLETE,
-        DEFAULT
-    }
     Status public override status;
-
-    event StatusChanged(Status prevStatus, Status newStatus);
 
     modifier onlyWhen(Status _requiredStatus) {
         require(status == _requiredStatus, "Loan: Incorrect status");
         _;
     }
 
-    function triggerNextStep() public virtual onlyWhen(Status.RUNNING) {
+    function sync() public override virtual onlyWhen(Status.RUNNING) {
         if (obligationPresent()) {
-            if (obligationMet()) {
-                if (noFutureObligations()) _setStatus(Status.COMPLETE);
-            } else _setStatus(Status.DEFAULT);
+            if (!obligationMet()) {
+                _setStatus(Status.DEFAULT);
+            } else if (noFutureObligations()) {
+                _setStatus(Status.COMPLETE);
+            }
         }
     }
 

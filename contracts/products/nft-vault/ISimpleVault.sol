@@ -10,11 +10,7 @@ interface ISimpleVault {
         address indexed toController
     );
 
-    function withdrawToken(
-        bytes32 _utid,
-        address destination,
-        bytes calldata data
-    ) external;
+    function withdrawToken(bytes32 _utid) external;
 
     function transfer(
         bytes32 _utid,

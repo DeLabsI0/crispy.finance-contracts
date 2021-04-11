@@ -7,7 +7,7 @@ import "./ISimpleVault.sol";
 
 contract SimpleVault is ISimpleVault, IERC721Receiver {
     string public constant name = "Universal ERC721 vault";
-    string public immutable version;
+    string public version;
     bytes32 internal immutable DOMAIN_SEPARATOR;
 
     struct Token {
@@ -33,7 +33,12 @@ contract SimpleVault is ISimpleVault, IERC721Receiver {
         ));
     }
 
-    function onERC721Received(address _operator, address, uint256 _tokenId, bytes)
+    function onERC721Received(
+        address _operator,
+        address,
+        uint256 _tokenId,
+        bytes calldata
+    )
         external
         override
         returns (bytes4)

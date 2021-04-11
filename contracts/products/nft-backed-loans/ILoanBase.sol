@@ -10,7 +10,7 @@ interface ILoanBase {
 
     event StatusChanged(Status prevStatus, Status newStatus);
 
-    function triggerNextStep() external;
+    function sync() external;
     function status() external view returns(Status);
     function obligationPresent() external view returns(bool);
     function obligationMet() external view returns(bool);
