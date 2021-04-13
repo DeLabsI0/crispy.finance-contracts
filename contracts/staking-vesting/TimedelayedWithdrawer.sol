@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.3;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -89,6 +89,7 @@ contract TimedelayedWithdrawer {
         require(withdrawal.unlockTime <= block.timestamp, "TdW: Withdrawal not yet unlocked");
 
         if (block.timestamp <= withdrawal.unlockTime + minExecutionDelay) {
+            // check done here to reduce gas usage, _cancelWithdrawal also checks status
             require(withdrawal.status == Status.PENDING, "TdW: No withdrawal to execute");
             address recipient = withdrawal.recipient;
             uint256 amount = withdrawal.amount;
