@@ -17,6 +17,8 @@ abstract contract LoanBase is ILoanBase {
                 _setStatus(Status.DEFAULT);
             } else if (noFutureObligations()) {
                 _setStatus(Status.COMPLETE);
+            } else {
+                _fulfillObligation();
             }
         }
     }
@@ -24,6 +26,7 @@ abstract contract LoanBase is ILoanBase {
     function obligationPresent() public view virtual override returns(bool);
     function obligationMet() public view virtual override returns(bool);
     function noFutureObligations() public view virtual override returns(bool);
+    function _fulfillObligation() internal virtual;
 
     function _setStatus(Status _newStatus) internal virtual {
         Status prevStatus = status;
