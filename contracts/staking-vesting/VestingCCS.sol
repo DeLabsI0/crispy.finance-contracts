@@ -39,20 +39,20 @@ contract VestingCCS is Ownable {
     event Drain(address indexed drainedBeneficiary, address indexed drainingTo);
 
     constructor(
-        IERC20 token_,
-        uint256 vestingStart,
-        uint256 cliff_,
-        uint256 vestingEnd_,
-        address beneficiary_
+        IERC20 _token,
+        uint256 _vestingStart,
+        uint256 _cliff,
+        uint256 _vestingEnd,
+        address _beneficiary
     ) Ownable() {
-        require(vestingEnd_ > vestingStart, "CCS: End not after start");
-        require(cliff_ < vestingEnd_, "CCS: Cliff must be before end");
-        token = token_;
-        lastRelease = vestingStart;
-        cliff = cliff_;
-        vestingEnd = vestingEnd_;
-        beneficiary = beneficiary_;
-        emit BeneficiaryUpdated(address(0), beneficiary_);
+        require(_vestingEnd > _vestingStart, "CCS: End not after start");
+        require(_cliff < _vestingEnd, "CCS: Cliff must be before end");
+        token = _token;
+        lastRelease = _vestingStart;
+        cliff = _cliff;
+        vestingEnd = _vestingEnd;
+        beneficiary = _beneficiary;
+        emit BeneficiaryUpdated(address(0), _beneficiary);
     }
 
     modifier onlyBeneficiary() {
@@ -60,16 +60,16 @@ contract VestingCCS is Ownable {
         _;
     }
 
-    function drain(address recipient) external onlyOwner {
+    function drain(address _recipient) external onlyOwner {
         uint256 remainingTokens = sync(false);
-        _withdrawTokens(recipient, remainingTokens);
-        address prevBeneficiary = _setBeneficiary(recipient);
-        emit Drain(prevBeneficiary, recipient);
+        _withdrawTokens(_recipient, remainingTokens);
+        address prevBeneficiary = _setBeneficiary(_recipient);
+        emit Drain(prevBeneficiary, _recipient);
     }
 
-    function changeBeneficiary(address newBeneficiary) external onlyOwner {
+    function changeBeneficiary(address _newBeneficiary) external onlyOwner {
         sync(false);
-        _setBeneficiary(newBeneficiary);
+        _setBeneficiary(_newBeneficiary);
     }
 
     function pendingTokens() public view returns(uint256) {
@@ -85,7 +85,7 @@ contract VestingCCS is Ownable {
         }
     }
 
-    function sync(bool revertOnFail) public returns(uint256) {
+    function sync(bool _revertOnFail) public returns(uint256) {
         uint256 pendingTokens_ = pendingTokens();
         uint256 stillVested = totalStillVested;
         bool failed = true;
@@ -102,19 +102,19 @@ contract VestingCCS is Ownable {
             failed = false;
         }
         totalStillVested = stillVested;
-        require(!revertOnFail || !failed, "CCS: Failed to sync");
+        require(!_revertOnFail || !failed, "CCS: Failed to sync");
         return stillVested;
     }
 
-    function _setBeneficiary(address newBeneficiary) internal returns(address) {
+    function _setBeneficiary(address _newBeneficiary) internal returns(address) {
         address prevBeneficiary = beneficiary;
-        beneficiary = newBeneficiary;
-        emit BeneficiaryUpdated(prevBeneficiary, newBeneficiary);
+        beneficiary = _newBeneficiary;
+        emit BeneficiaryUpdated(prevBeneficiary, _newBeneficiary);
         return prevBeneficiary;
     }
 
-    function _withdrawTokens(address recipient, uint256 amount) internal {
-        token.safeTransfer(recipient, amount);
-        emit Withdraw(recipient, amount);
+    function _withdrawTokens(address _recipient, uint256 _amount) internal {
+        token.safeTransfer(_recipient, _amount);
+        emit Withdraw(_recipient, _amount);
     }
 }
