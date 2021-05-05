@@ -29,7 +29,8 @@ contract RoleRegistry is ERC721, IRoleRegistry {
         external override returns(uint256)
     {
         uint256 tokenId = getTokenId(msg.sender, _roleId);
-        _safeMint(_account, tokenId);
+        // checks if token already exists
+        _safeMint(_account, tokenId, abi.encode(_roleId));
         return tokenId;
     }
 
@@ -37,10 +38,11 @@ contract RoleRegistry is ERC721, IRoleRegistry {
         external override returns(uint256)
     {
         uint256 tokenId = getTokenId(msg.sender, _roleId);
+        bytes memory encodedRole = abi.encode(_roleId);
         if (_exists(tokenId)) {
-            _safeTransfer(ownerOf(tokenId), _account, tokenId, "");
+            _safeTransfer(ownerOf(tokenId), _account, tokenId, encodedRole);
         } else {
-            _safeMint(_account, tokenId);
+            _safeMint(_account, tokenId, encodedRole);
         }
         return tokenId;
     }
