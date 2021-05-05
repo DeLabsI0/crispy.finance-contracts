@@ -88,7 +88,7 @@ contract SimpleVault is ISimpleVault, IERC721Receiver {
     {
         return keccak256(abi.encodePacked(
             DOMAIN_SEPARATOR,
-            bytes4(0x3b3097fc), // getUtid selector
+            ISimpleVault.getUtid.selector, // getUtid selector
             _tokenContract,
             _tokenId
         ));
