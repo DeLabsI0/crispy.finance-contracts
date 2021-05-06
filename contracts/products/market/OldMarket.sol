@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IDepositController.sol";
 import "./ITokenVault.sol";
 
-contract Market is Ownable, IDepositController {
+contract OldMarket is Ownable, IDepositController {
     uint256 public constant withdrawDelay = 7 days;
     uint256 public constant disputeTime = 3 days;
     uint256 public constant counterDisputeTime = 14 days;

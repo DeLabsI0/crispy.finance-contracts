@@ -4,11 +4,12 @@ pragma solidity ^0.8.3;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "../../general/RoleManager.sol";
-import "./IOrderListener.sol";
 
 contract Market is RoleManager {
     using SafeERC20 for IERC20;
+    using Address for address;
 
     // keccak256("crispy-finance.market.mvp.feeManager")
     bytes32 internal constant FEE_MANAGER =
@@ -36,30 +37,34 @@ contract Market is RoleManager {
     uint256 public iFee; // inverse fee; 1 - fee
     Order[] public orderBook;
 
-    event FeeSet(uint256 indexed newFee);
+    event FeeSet(uint256 indexed newInverseFee);
     event OrderCreated(
         uint256 indexed orderId,
         address indexed creator,
         address indexed permittedFiller
     );
+    event OrderFilled(
+        uint256 indexed orderId,
+        address indexed filler,
+        uint256 usedInverseFee
+    );
+    event OrderCancelled(uint256 indexed orderId);
 
     constructor(IRoleRegistry _roleRegistry) RoleManager(_roleRegistry) {
         _roleRegistry.registerRole(FEE_MANAGER, msg.sender);
         roleRegistry = _roleRegistry;
     }
 
-    function setFee(uint256 _newFee) external onlyRole(FEE_MANAGER) {
-        iFee = SCALE - _newFee;
-        emit FeeSet(_newFee);
+    function setFee(uint256 _newInverseFee) external onlyRole(FEE_MANAGER) {
+        iFee = _newInverseFee;
+        emit FeeSet(_newInverseFee);
     }
 
     function collectFees(
         IERC20 _paymentToken,
         address _destination,
         uint256 _withdrawAmount
-    )
-        external onlyRole(FEE_MANAGER)
-    {
+    ) external onlyRole(FEE_MANAGER) {
         _paymentToken.safeTransfer(_destination, _withdrawAmount);
     }
 
@@ -71,9 +76,7 @@ contract Market is RoleManager {
         IERC20 _paymentToken,
         uint256 _paymentAmount,
         uint256 _allowedInverseFee
-    )
-        external returns (uint256 orderId)
-    {
+    ) external returns (uint256 orderId) {
         OrderStatus status = _isSellOrder ? OrderStatus.SELL : OrderStatus.BUY;
         orderId = orderBook.length;
         orderBook.push(Order({
@@ -86,18 +89,6 @@ contract Market is RoleManager {
             paymentAmount: _paymentAmount,
             allowedInverseFee: _allowedInverseFee
         }));
-        try _tokenContract.ownerOf(_tokenId) returns (address tokenOwner) {
-            IOrderListener(tokenOwner).receiveOrder(
-                msg.sender,
-                _isSellOrder,
-                _permittedFiller,
-                _tokenContract,
-                _tokenId,
-                _paymentToken,
-                _paymentAmount,
-                _allowedInverseFee
-            );
-        } catch {}
 
         emit OrderCreated(orderId, msg.sender, _permittedFiller);
     }
@@ -118,6 +109,7 @@ contract Market is RoleManager {
         order.tokenContract.safeTransferFrom(seller, buyer, order.tokenId);
         paymentToken.safeTransferFrom(buyer, address(this), paymentAmount);
         paymentToken.safeTransfer(seller, paymentAmount * iFee_ / SCALE);
+        emit OrderFilled(_orderId, msg.sender, iFee_);
     }
 
     function cancelOrder(uint256 _orderId) external {
