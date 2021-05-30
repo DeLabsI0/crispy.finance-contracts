@@ -11,7 +11,7 @@ contract Market is Ownable {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    uint256 internal constant SCALE = 1e18;
+    uint256 public constant SCALE = 1e18;
 
     enum OrderStatus {
         BUY,
