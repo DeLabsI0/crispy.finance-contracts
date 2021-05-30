@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "../utils/interfaces/IOwnable.sol";
+import "../lib/interfaces/IOwnable.sol";
 
 contract Ownership is ERC721 {
     uint256 public constant MASTER_OWNER_TOKEN_ID = uint256(0);
@@ -35,12 +35,12 @@ contract Ownership is ERC721 {
 
     function tokenizeOwnershipOf(IOwnable owned) external {
         require(owned.owner() == address(this), "CRTO: Self not yet owner");
-        _safeMint(_preRegisteredOwners[owned], uint256(address(owned)));
+        _safeMint(_preRegisteredOwners[owned], uint256(uint160(address(owned))));
         emit OwnershipTokenized(address(owned));
     }
 
     function detokenize(uint256 tokenId) external onlyOwnerOf(tokenId) {
-        IOwnable owned = IOwnable(address(tokenId));
+        IOwnable owned = IOwnable(address(uint160(tokenId)));
         owned.transferOwnership(msg.sender);
         _burn(tokenId);
     }
@@ -51,7 +51,7 @@ contract Ownership is ERC721 {
         onlyOwnerOf(tokenId)
     {
         require(ownerOf(tokenId) == msg.sender, "CRTO: Caller not token owner");
-        address owned = address(tokenId);
+        address owned = address(uint160(tokenId));
 
         bytes4 selector;
         assembly {
@@ -64,20 +64,5 @@ contract Ownership is ERC721 {
 
         (bool success, bytes memory returnData) = owned.call{ value: msg.value }(callData);
         require(success, string(returnData));
-    }
-
-    function setTokenURI(uint256 tokenId, string memory _tokenURI)
-        external
-        onlyOwnerOf(tokenId)
-    {
-        _setTokenURI(tokenId, _tokenURI);
-    }
-
-    function setBaseURI(string memory baseURI_) external {
-        require(
-            ownerOf(MASTER_OWNER_TOKEN_ID) == msg.sender,
-            "CRTO: caller not master owner"
-        );
-        _setBaseURI(baseURI_);
     }
 }

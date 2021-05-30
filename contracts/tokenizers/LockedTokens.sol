@@ -1,7 +1,6 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -16,6 +15,7 @@ contract LockedTokens is ERC721, Ownable {
 
     uint256 public totalLocksCreated;
     mapping(uint256 => TokenizedLock) internal _tokenizedLocks;
+    string internal tokenBaseURI;
 
     constructor()
         ERC721("Crispy.finance tokenized timelocked tokens", "CR3T")
@@ -56,7 +56,7 @@ contract LockedTokens is ERC721, Ownable {
         uint256 totalToDeposit = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             uint256 amount = amounts[i];
-            totalToDeposit = SafeMath.add(totalToDeposit, amount);
+            totalToDeposit += amount;
             _recordLock(
                 curNonce + i,
                 token,
@@ -92,7 +92,11 @@ contract LockedTokens is ERC721, Ownable {
     }
 
     function setBaseURI(string memory baseURI_) external onlyOwner {
-        _setBaseURI(baseURI_);
+        tokenBaseURI = baseURI_;
+    }
+
+    function _baseURI() internal view override returns(string memory) {
+        return tokenBaseURI;
     }
 
     function getLockInfo(uint256 tokenId)

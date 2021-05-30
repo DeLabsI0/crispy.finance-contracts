@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
 contract TreasuryTester {
     bytes32 public constant key = keccak256("password");

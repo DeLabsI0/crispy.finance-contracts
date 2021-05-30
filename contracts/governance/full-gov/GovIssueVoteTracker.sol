@@ -1,12 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./GovVotePowerTracker.sol";
 
 contract GovIssueVoteTracker is GovVotePowerTracker {
-    using SafeMath for uint256;
-
     mapping(bytes32 => uint256) internal _totalVotesFor;
     mapping(bytes32 => uint256) internal _totalVotesAgainst;
     mapping(bytes32 => mapping(address => uint256)) internal _votersVotesFor;
@@ -15,8 +12,7 @@ contract GovIssueVoteTracker is GovVotePowerTracker {
     function _voteFor(address voter, bytes32 issue) internal virtual {
         uint256 prevVotesAgainst = _votersVotesAgainst[issue][voter];
         if (prevVotesAgainst > 0) {
-            _totalVotesAgainst[issue] =
-                _totalVotesAgainst[issue].sub(prevVotesAgainst);
+            _totalVotesAgainst[issue] -= prevVotesAgainst;
             _votersVotesAgainst[issue][voter] = 0;
         }
 
@@ -24,15 +20,14 @@ contract GovIssueVoteTracker is GovVotePowerTracker {
         uint256 votingPower = _votingPower[voter];
         if (votingPower > prevVotesFor) {
             _votersVotesFor[issue][voter] = votingPower;
-            _totalVotesFor[issue] =
-                _totalVotesFor[issue].add(votingPower - prevVotesFor);
+            _totalVotesFor[issue] = votingPower - prevVotesFor;
         }
     }
 
     function _voteAgainst(address voter, bytes32 issue) internal virtual {
         uint256 prevVotesFor = _votersVotesFor[issue][voter];
         if (prevVotesFor > 0) {
-            _totalVotesFor[issue] = _totalVotesFor[issue].sub(prevVotesFor);
+            _totalVotesFor[issue] -= prevVotesFor;
             _votersVotesFor[issue][voter] = 0;
         }
 
@@ -40,8 +35,7 @@ contract GovIssueVoteTracker is GovVotePowerTracker {
         uint256 votingPower = _votingPower[voter];
         if (votingPower > prevVotesAgainst) {
             _votersVotesAgainst[issue][voter] = votingPower;
-            _totalVotesAgainst[issue] =
-                _totalVotesAgainst[issue].add(votingPower - prevVotesAgainst);
+            _totalVotesAgainst[issue] += votingPower - prevVotesAgainst;
         }
     }
 }

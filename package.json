@@ -15,8 +15,6 @@
   "license": "ISC",
   "dependencies": {
     "@openzeppelin/contracts": "^4.0.0",
-    "ez-staker-contracts": "^2.3.0",
-    "safe-qmath": "^2.1.0",
     "truffle": "^5.3.1"
   },
   "devDependencies": {

@@ -1,12 +1,9 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
-pragma solidity >=0.6.0 <0.8.0;
-
-import '@openzeppelin/contracts/math/SafeMath.sol';
-import '@openzeppelin/contracts/utils/Arrays.sol';
+import "@openzeppelin/contracts/utils/Arrays.sol";
 
 library ValueSnapshots {
-    using SafeMath for uint256;
     using Arrays for uint256[];
 
     struct Snapshots {
@@ -17,7 +14,7 @@ library ValueSnapshots {
     function getValueAt(Snapshots storage snapshots, uint256 snapshotId)
         internal view returns (bool, uint256)
     {
-        require(snapshotId > 0, 'ValueSnapshots: id is 0');
+        require(snapshotId > 0, "ValueSnapshots: id is 0");
 
         uint256 index = snapshots.ids.findUpperBound(snapshotId);
 

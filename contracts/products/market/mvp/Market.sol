@@ -5,15 +5,12 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "../../general/RoleManager.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Market is RoleManager {
+contract Market is Ownable {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    // keccak256("crispy-finance.market.mvp.feeManager")
-    bytes32 internal constant FEE_MANAGER =
-        0x232f9a8b283ede7b1c7e272f6d4d1b793dce941b6e70850ee3583c8cad6d9a5b;
     uint256 internal constant SCALE = 1e18;
 
     enum OrderStatus {
@@ -50,12 +47,9 @@ contract Market is RoleManager {
     );
     event OrderCancelled(uint256 indexed orderId);
 
-    constructor(IRoleRegistry _roleRegistry) RoleManager(_roleRegistry) {
-        _roleRegistry.registerRole(FEE_MANAGER, msg.sender);
-        roleRegistry = _roleRegistry;
-    }
+    constructor() Ownable() { }
 
-    function setFee(uint256 _newInverseFee) external onlyRole(FEE_MANAGER) {
+    function setFee(uint256 _newInverseFee) external onlyOwner {
         iFee = _newInverseFee;
         emit FeeSet(_newInverseFee);
     }
@@ -64,7 +58,7 @@ contract Market is RoleManager {
         IERC20 _paymentToken,
         address _destination,
         uint256 _withdrawAmount
-    ) external onlyRole(FEE_MANAGER) {
+    ) external onlyOwner {
         _paymentToken.safeTransfer(_destination, _withdrawAmount);
     }
 
@@ -89,7 +83,6 @@ contract Market is RoleManager {
             paymentAmount: _paymentAmount,
             allowedInverseFee: _allowedInverseFee
         }));
-
         emit OrderCreated(orderId, msg.sender, _permittedFiller);
     }
 
@@ -131,6 +124,7 @@ contract Market is RoleManager {
         _checkFillable(order);
         require(order.creator == msg.sender, "Market: unauthorized cancel");
         order.status = OrderStatus.CANCELLED;
+        emit OrderCancelled(_orderId);
     }
 
     function _checkFillable(Order storage _order) internal view returns(bool) {

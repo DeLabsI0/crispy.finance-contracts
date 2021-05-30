@@ -1,25 +1,21 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.7.6;
-
-import "@openzeppelin/contracts/math/SafeMath.sol";
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
 contract GovVotePowerTracker {
-    using SafeMath for uint256;
-
     mapping(address => uint256) internal _votingPower;
     mapping(address => uint256) internal _baseVotingPower;
     mapping(address => address) internal _delegates;
 
     function _addVotes(address voter, uint256 votes) internal {
-        _baseVotingPower[voter] = _baseVotingPower[voter].add(votes);
+        _baseVotingPower[voter] += votes;
         address actingVoter = _getActingVoter(voter, _delegates[voter]);
-        _votingPower[actingVoter] = _votingPower[actingVoter].add(votes);
+        _votingPower[actingVoter] += votes;
     }
 
     function _removeVotes(address voter, uint256 votes) internal {
-        _baseVotingPower[voter] = _baseVotingPower[voter].sub(votes);
+        _baseVotingPower[voter] -= votes;
         address actingVoter = _getActingVoter(voter, _delegates[voter]);
-        _votingPower[actingVoter] = _votingPower[actingVoter].sub(votes);
+        _votingPower[actingVoter] -= votes;
     }
 
     function _setDelegate(address voter, address newDelegate) internal returns(bool) {
@@ -29,8 +25,8 @@ contract GovVotePowerTracker {
             return false;
         }
         uint256 basePow = _baseVotingPower[voter];
-        _votingPower[prevActingVoter] = _votingPower[prevActingVoter].sub(basePow);
-        _votingPower[newActingVoter] = _votingPower[newActingVoter].add(basePow);
+        _votingPower[prevActingVoter] = basePow;
+        _votingPower[newActingVoter] = basePow;
         return true;
     }
 

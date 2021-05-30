@@ -2,9 +2,8 @@
 pragma solidity ^0.8.3;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "../utils/SigningContract.sol";
 
-contract Controller is Ownable, SigningContract {
+contract Controller is Ownable {
     constructor() Ownable() { }
 
     function executeCall(
@@ -15,11 +14,7 @@ contract Controller is Ownable, SigningContract {
             bool success,
             bytes memory returnData
         ) = destination.call{ value: msg.value }(callData);
-        require(success);
+        require(success, string(returnData));
         return returnData;
-    }
-
-    function sign(bytes32 hash) external onlyOwner {
-        _sign(hash);
     }
 }

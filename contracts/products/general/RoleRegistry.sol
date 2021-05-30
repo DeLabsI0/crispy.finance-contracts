@@ -9,6 +9,12 @@ contract RoleRegistry is ERC721, IRoleRegistry {
 
     bytes32 internal immutable DOMAIN_SEPARATOR;
 
+    event RoleRegistered(
+        address indexed registrant,
+        bytes32 indexed roleId,
+        uint256 indexed tokenId
+    );
+
     constructor(string memory _version) ERC721("Universal role registry", "URR") {
         version = _version;
         uint256 chainId;

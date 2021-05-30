@@ -1,14 +1,11 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+// SPDX-License-Identifier: GPL-3.0-only
+pragma solidity ^0.8.3;
 
 import '@openzeppelin/contracts/access/Ownable.sol';
-import '@openzeppelin/contracts/math/SafeMath.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 
 contract PoolSale is Ownable {
-    using SafeMath for uint256;
-
     IERC20 public tokenBeingSold;
     address payable public treasury;
     uint256 public constant PUSH_REWARD = 0.1 ether;
@@ -56,11 +53,11 @@ contract PoolSale is Ownable {
         require(block.timestamp >= saleStart, "Sale hasn't started yet");
         require(block.timestamp <= saleEnd, "Sale has already ended");
         require(
-            address(this).balance.add(msg.value) <= maxEther,
+            address(this).balance + msg.value <= maxEther,
             "Pool full"
        );
 
-       saleAllocation[msg.sender] = saleAllocation[msg.sender].add(msg.value);
+       saleAllocation[msg.sender] += msg.value;
     }
 
     function pushToTreasury() external {
@@ -73,9 +70,9 @@ contract PoolSale is Ownable {
         totalTokensBeingSold = availableTokens();
         _totalEthDeposited = address(this).balance;
 
-        uint256 amountToBePushed = _totalEthDeposited.sub(PUSH_REWARD);
+        uint256 amountToBePushed = _totalEthDeposited - PUSH_REWARD;
         treasury.transfer(amountToBePushed);
-        msg.sender.transfer(PUSH_REWARD);
+        payable(msg.sender).transfer(PUSH_REWARD);
     }
 
     function availableTokens() public view returns(uint256) {
@@ -90,6 +87,6 @@ contract PoolSale is Ownable {
         uint256 totalEth = _totalEthDeposited > 0
             ? _totalEthDeposited
             : address(this).balance;
-        return allocation.mul(totalTokens).div(totalEth);
+        return allocation * totalTokens / totalEth;
     }
 }

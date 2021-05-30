@@ -6,7 +6,7 @@ pragma solidity ^0.8.3;
 */
 abstract contract SigningContract {
     // bytes4(keccak256("isValidSignature(bytes32,bytes)")
-    bytes4 constant internal MAGICVALUE = 0x1626ba7e;
+    bytes4 constant internal ERC1271_MAGIC = 0x1626ba7e;
 
     mapping(bytes32 => bool) internal _signedHashes;
 
@@ -19,7 +19,7 @@ abstract contract SigningContract {
         view
         returns (bytes4)
     {
-        return hashSigned(hash) ? MAGICVALUE : bytes4(0);
+        return hashSigned(hash) ? ERC1271_MAGIC : bytes4(0);
     }
 
     function _sign(bytes32 hash) internal virtual {
