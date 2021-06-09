@@ -31,6 +31,7 @@ contract Market is Ownable {
         uint256 allowedInverseFee;
     }
 
+    bool public marketShutdown;
     uint256 public iFee; // inverse fee; 1 - fee
     Order[] public orderBook;
 
@@ -46,10 +47,16 @@ contract Market is Ownable {
         uint256 usedInverseFee
     );
     event OrderCancelled(uint256 indexed orderId);
+    event MarketShutdown();
 
     constructor() Ownable() { }
 
-    function setFee(uint256 _newInverseFee) external onlyOwner {
+    modifier notShutdown() {
+        require(!marketShutdown, "Market: already shutdown");
+        _;
+    }
+
+    function setFee(uint256 _newInverseFee) external onlyOwner notShutdown {
         iFee = _newInverseFee;
         emit FeeSet(_newInverseFee);
     }
@@ -62,6 +69,11 @@ contract Market is Ownable {
         _paymentToken.safeTransfer(_destination, _withdrawAmount);
     }
 
+    function shutdown() external onlyOwner notShutdown {
+        marketShutdown = true;
+        emit MarketShutdown();
+    }
+
     function createOrder(
         bool _isSellOrder,
         address _permittedFiller,
@@ -70,7 +82,7 @@ contract Market is Ownable {
         IERC20 _paymentToken,
         uint256 _paymentAmount,
         uint256 _allowedInverseFee
-    ) external returns (uint256 orderId) {
+    ) external notShutdown returns (uint256 orderId) {
         OrderStatus status = _isSellOrder ? OrderStatus.SELL : OrderStatus.BUY;
         orderId = orderBook.length;
         orderBook.push(Order({
@@ -86,10 +98,11 @@ contract Market is Ownable {
         emit OrderCreated(orderId, msg.sender, _permittedFiller);
     }
 
-    function fill(uint256 _orderId) external {
+    function fillOrder(uint256 _orderId) external notShutdown {
+        require(_orderId < totalOrders(), "Market: non-existant order");
         Order storage order = orderBook[_orderId];
         bool isBuyOrder = _checkFillable(order);
-        _checkCanFill(order, msg.sender);
+        _checkAccountCanFill(order, msg.sender);
         uint256 iFee_ = iFee;
         require(order.allowedInverseFee <= iFee_, "Market: allowed fee too low");
 
@@ -136,7 +149,7 @@ contract Market is Ownable {
         return isBuyOrder;
     }
 
-    function _checkCanFill(Order storage _order, address _filler) internal view {
+    function _checkAccountCanFill(Order storage _order, address _filler) internal view {
         address permittedFiller = _order.permittedFiller;
         require(
             permittedFiller == address(0) || permittedFiller == _filler,
