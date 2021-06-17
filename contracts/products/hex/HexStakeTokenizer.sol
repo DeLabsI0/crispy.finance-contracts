@@ -110,9 +110,13 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     function unstakeManyTo(address _recipient, uint256[] memory _tokenIds)
         public
     {
+        uint256 totalUnstakedAmount;
         for (uint256 i; i < _tokenIds.length; i++) {
-            unstakeTo(_recipient, _tokenIds[i]);
+            uint256 tokenId = _tokenIds[i];
+            uint256 stakeIndex = _tokenIdToStakeIndex.get(tokenId);
+            totalUnstakedAmount += _unstake(tokenId, stakeIndex);
         }
+        hexToken.safeTransfer(_recipient, totalUnstakedAmount);
     }
 
     function unstake(uint256 _tokenId) external {
@@ -120,10 +124,8 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     }
 
     function unstakeTo(address _recipient, uint256 _tokenId) public {
-        require(ownerOf(_tokenId) == msg.sender, "CHXS: Not token owner");
         uint256 stakeIndex = _tokenIdToStakeIndex.get(_tokenId);
-        uint256 stakeId = _verifyTokenStake(_tokenId, stakeIndex);
-        _unstakeTo(_recipient, _tokenId, stakeIndex, stakeId);
+        _unstakeTo(_recipient, _tokenId, stakeIndex);
     }
 
     /* should only be used if there is a bug in the sc and `unstakeTo` no longer
@@ -135,9 +137,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     )
         external
     {
-        require(ownerOf(_tokenId) == msg.sender, "CHXS: Not token owner");
-        uint256 stakeId = _verifyTokenStake(_tokenId, _stakeIndex);
-        _unstakeTo(_recipient, _tokenId, _stakeIndex, stakeId);
+        _unstakeTo(_recipient, _tokenId, _stakeIndex);
     }
 
     function getStakeIndex(uint256 _tokenId) public view returns (uint256) {
@@ -170,12 +170,29 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     function _unstakeTo(
         address _recipient,
         uint256 _tokenId,
-        uint256 _stakeIndex,
-        uint256 _stakeId
+        uint256 _stakeIndex
     )
         internal
     {
-        _endStakeTo(_recipient, _stakeIndex, _stakeId);
+        uint256 unstakedAmount = _unstake(_tokenId, _stakeIndex);
+        hexToken.safeTransfer(_recipient, unstakedAmount);
+    }
+
+    function _unstake(uint256 _tokenId, uint256 _stakeIndex)
+        internal returns (uint256 unstakedAmount)
+    {
+        require(ownerOf(_tokenId) == msg.sender, "CHXS: Not token owner");
+        uint256 stakeId = _verifyTokenStakeIndex(_tokenId, _stakeIndex);
+        unstakedAmount = _endStake(_tokenId, _stakeIndex, stakeId);
+    }
+
+    function _endStake(
+        uint256 _tokenId,
+        uint256 _stakeIndex,
+        uint256 _stakeId
+    )
+        internal returns (uint256 unstakedAmount)
+    {
         _burn(_tokenId);
 
         // if it wasn't the last stake in the list something got rearanged
@@ -184,24 +201,15 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
             uint256 topTokenId = _tokenIdToStakeIndex.rget(totalSupply_);
             _tokenIdToStakeIndex.set(topTokenId, _stakeIndex);
         }
-    }
 
-    function _endStakeTo(
-        address _recipient,
-        uint256 _stakeIndex,
-        uint256 _stakeId
-    )
-        internal
-    {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
         hexToken.stakeEnd(_stakeIndex, uint40(_stakeId));
         unchecked {
-            uint256 unstakeAmount = hexToken.balanceOf(address(this)) - balanceBefore;
-            hexToken.safeTransfer(_recipient, unstakeAmount);
+            unstakedAmount = hexToken.balanceOf(address(this)) - balanceBefore;
         }
     }
 
-    function _verifyTokenStake(uint256 _tokenId, uint256 _stakeIndex)
+    function _verifyTokenStakeIndex(uint256 _tokenId, uint256 _stakeIndex)
         internal view returns (uint256 stakeId)
     {
         stakeId = _getStakeIdOf(_stakeIndex);
