@@ -18,13 +18,17 @@
  *
  */
 
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
+const HDWalletProvider = require('@truffle/hdwallet-provider')
+require('dotenv').config()
+
+const devMnemonic = process.env.DEV_MNEMONIC
 // const infuraKey = "fj4jll3k.....";
 //
 // const fs = require('fs');
 // const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 module.exports = {
+  contracts_build_directory: './build/contracts',
   /**
    * Networks define how you connect to your ethereum client and let you set the
    * defaults web3 uses to send transactions. If you don't specify one truffle
@@ -42,11 +46,12 @@ module.exports = {
     // tab if you use this network and you must also set the `host`, `port` and `network_id`
     // options below to some value.
     //
-    // development: {
-    //  host: "127.0.0.1",     // Localhost (default: none)
-    //  port: 8545,            // Standard Ethereum port (default: none)
-    //  network_id: "*",       // Any network (default: none)
-    // },
+    development: {
+      host: '127.0.0.1', // Localhost (default: none)
+      port: 7545, // Standard Ethereum port (default: none)
+      network_id: '5777', // Any network (default: none)
+      provider: () => new HDWalletProvider(devMnemonic, 'http://127.0.0.1:7545')
+    }
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port

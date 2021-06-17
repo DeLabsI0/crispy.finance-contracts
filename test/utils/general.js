@@ -9,7 +9,7 @@ const bnSum = (...nums) => nums.reduce((x, y) => x.add(y), ZERO)
 const encodeFunctionCall = (contract, method, args) => {
   return contract.contract.methods[method](...args).encodeABI()
 }
-const ether = (wei) => new BN(web3.utils.toWei(wei.toString()))
+const ether = (wei, scale) => new BN(web3.utils.toWei(wei.toString(), scale))
 const bnPerc = (num, perc) => num.mul(new BN(perc)).div(new BN('100'))
 const getDetAddr = (addr, nonce) => {
   const rlpEncoded = rlp.encode([addr, nonce])
