@@ -16,10 +16,6 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     uint256 public totalSupply;
     string public currentBaseURI;
 
-    /*
-       TODO: batch stake creation
-    */
-
     // stores stakeId to make sure stakes cannot be confused
     mapping(uint256 => uint256) internal _stakeIdOfToken;
     TwoWayMapping.UintToUint internal _tokenIdToStakeIndex;
