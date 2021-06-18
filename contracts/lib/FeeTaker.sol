@@ -27,7 +27,7 @@ abstract contract FeeTaker is Ownable {
         _setFee(_fee);
     }
 
-    function withdrawFee(IERC20 _token, address _recipient, uint256 _amount)
+    function withdrawFeeTo(address _recipient, IERC20 _token, uint256 _amount)
         external virtual onlyOwner
     {
         uint256 _accountedFee = _accountedFees[_token];
@@ -67,7 +67,7 @@ abstract contract FeeTaker is Ownable {
     }
 
     function _setFee(uint256 _fee) internal virtual {
-        require(_fee <= SCALE, "FeeTaker: fee too high");
+        require(_fee <= SCALE, "FeeTaker: fee above 100%");
         fee = _fee;
         emit FeeSet(msg.sender, _fee);
     }
