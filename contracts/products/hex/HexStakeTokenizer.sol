@@ -27,17 +27,6 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         hexToken = _hexToken;
     }
 
-    function createStakes(
-        uint256[] memory _totalAmounts,
-        uint256[] memory _stakeDays,
-        uint256 _maxFee,
-        uint256 _total
-    )
-        external
-    {
-        createStakesFor(msg.sender, _totalAmounts, _stakeDays, _maxFee, _total);
-    }
-
     function createStakesFor(
         address _recipient,
         uint256[] memory _totalAmounts,
@@ -45,7 +34,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         uint256 _maxFee,
         uint256 _total
     )
-        public
+        external
     {
         _checkFeeAtMost(_maxFee);
         require(_totalAmounts.length == _stakeDays.length, "CHXS: Input length mismatch");
@@ -64,23 +53,13 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         }
     }
 
-    function createStake(
-        uint256 _totalAmount,
-        uint256 _stakeDays,
-        uint256 _maxFee
-    )
-        external
-    {
-        createStakeFor(msg.sender, _totalAmount, _stakeDays, _maxFee);
-    }
-
     function createStakeFor(
         address _recipient,
         uint256 _totalAmount,
         uint256 _stakeDays,
         uint256 _maxFee
     )
-        public
+        external
     {
         _checkFeeAtMost(_maxFee);
         hexToken.safeTransferFrom(msg.sender, address(this), _totalAmount);
@@ -92,19 +71,8 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         currentBaseURI = _newBaseURI;
     }
 
-    function directStakeTo(address _recipient, uint256 _stakeAmount, uint256 _stakeDays)
-        external onlyOwner
-    {
-        hexToken.safeTransferFrom(msg.sender, address(this), _stakeAmount);
-        _stakeFor(_recipient, _stakeAmount, _stakeDays);
-    }
-
-    function unstakeMany(uint256[] memory _tokenIds) external {
-        unstakeManyTo(msg.sender, _tokenIds);
-    }
-
     function unstakeManyTo(address _recipient, uint256[] memory _tokenIds)
-        public
+        external
     {
         uint256 totalUnstakedAmount;
         for (uint256 i; i < _tokenIds.length; i++) {
@@ -115,11 +83,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         hexToken.safeTransfer(_recipient, totalUnstakedAmount);
     }
 
-    function unstake(uint256 _tokenId) external {
-        unstakeTo(msg.sender, _tokenId);
-    }
-
-    function unstakeTo(address _recipient, uint256 _tokenId) public {
+    function unstakeTo(address _recipient, uint256 _tokenId) external {
         uint256 stakeIndex = _tokenIdToStakeIndex.get(_tokenId);
         _unstakeTo(_recipient, _tokenId, stakeIndex);
     }
