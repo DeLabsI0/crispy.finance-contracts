@@ -29,26 +29,28 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
 
     function createStakesFor(
         address _recipient,
-        uint256[] memory _totalAmounts,
+        uint256[] memory _stakeAmounts,
         uint256[] memory _stakeDays,
         uint256 _maxFee,
-        uint256 _total
+        uint256 _upfrontTotal
     )
         external
     {
         _checkFeeAtMost(_maxFee);
-        require(_totalAmounts.length == _stakeDays.length, "CHXS: Input length mismatch");
-        hexToken.safeTransferFrom(msg.sender, address(this), _total);
-        uint256 afterFeeTotal = _takeFee(hexToken, _total);
+        require(_stakeAmounts.length == _stakeDays.length, "CHXS: Input length mismatch");
+        hexToken.safeTransferFrom(msg.sender, address(this), _upfrontTotal);
         uint256 realTotal;
-        for (uint256 i; i < _totalAmounts.length; i++) {
-            uint256 totalAmount = _totalAmounts[i];
-            realTotal += totalAmount;
-            _stakeFor(_recipient, totalAmount, _stakeDays[i]);
+        for (uint256 i; i < _stakeAmounts.length; i++) {
+            uint256 stakeAmount = _stakeAmounts[i];
+            realTotal += stakeAmount;
+            _stakeFor(_recipient, stakeAmount, _stakeDays[i]);
         }
-        require(afterFeeTotal >= realTotal, "CHXS: Insufficient funds");
+        uint256 feeToTake = realTotal * fee / (SCALE - fee);
+        _accountFee(hexToken, feeToTake);
+        uint256 stakeCost = realTotal + feeToTake;
+        require(_upfrontTotal >= stakeCost, "CHXS: Insufficient funds");
         unchecked {
-            uint256 refundAmount = afterFeeTotal - realTotal;
+            uint256 refundAmount = _upfrontTotal - stakeCost;
             if (refundAmount > 0) hexToken.safeTransfer(msg.sender, refundAmount);
         }
     }
@@ -90,7 +92,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
 
     /* should only be used if there is a bug in the sc and `unstakeTo` no longer
        works */
-    function manualUnstakeTo(
+    function manuallyUnstakeTo(
         address _recipient,
         uint256 _tokenId,
         uint256 _stakeIndex
