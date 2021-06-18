@@ -46,9 +46,9 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
             _stakeFor(_recipient, stakeAmount, _stakeDays[i]);
         }
         uint256 feeToTake = realTotal * fee / (SCALE - fee);
-        _accountFee(hexToken, feeToTake);
         uint256 stakeCost = realTotal + feeToTake;
         require(_upfrontTotal >= stakeCost, "CHXS: Insufficient funds");
+        _accountFee(hexToken, feeToTake);
         unchecked {
             uint256 refundAmount = _upfrontTotal - stakeCost;
             if (refundAmount > 0) hexToken.safeTransfer(msg.sender, refundAmount);
