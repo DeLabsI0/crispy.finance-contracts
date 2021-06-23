@@ -53,13 +53,13 @@ abstract contract FeeTaker is Ownable {
         require(_maxFee >= fee, "FeeTaker: fee too high");
     }
 
-    function _takeFeeForTotal(uint256 _totalAmount, IERC20 _token)
-        internal virtual return (uint256)
+    function _addFeeForTotal(uint256 _totalAmount, IERC20 _token)
+        internal virtual returns (uint256)
     {
         uint256 fee_ = fee;
         if (fee_ == 0) return _totalAmount;
-        uint256 feeToTake = realTotal * fee_ / (SCALE - fee_);
-        _accountFee(_token, feeToTake);
+        uint256 feeToTake = _totalAmount * fee_ / (SCALE - fee_);
+        _accountFee(feeToTake, _token);
         return _totalAmount + feeToTake;
     }
 
@@ -68,12 +68,12 @@ abstract contract FeeTaker is Ownable {
     {
         uint256 fee_ = fee;
         if (fee_ == 0) return _totalAmount;
-        uint256 takenFee = _totalAmount * fee_ / SCALE;
-        _accountFee(_token, takenFee);
-        return _totalAmount - takenFee;
+        uint256 feeToTake = _totalAmount * fee_ / SCALE;
+        _accountFee(feeToTake, _token);
+        return _totalAmount - feeToTake;
     }
 
-    function _accountFee(IERC20 _token, uint256 _fee) internal virtual {
+    function _accountFee(uint256 _fee, IERC20 _token) internal virtual {
         accountedFees[_token] += _fee;
         emit AccountedFee(_token, _fee);
     }
