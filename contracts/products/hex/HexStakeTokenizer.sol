@@ -97,8 +97,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
         _importFundsWithFee(_addedAmount, _maxFee);
-        uint256 stakeIndex = getStakeIndex(_tokenId);
-        uint256 stakeId = _checkToken(_tokenId, stakeIndex);
+        (uint256 stakeIndex, uint256 stakeId) = _checkToken(_tokenId);
         _closeStake(stakeIndex, stakeId);
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         uint256 newStakeAmount = _takeFeeFrom(balanceAfter - balanceBefore, hexToken);
@@ -167,14 +166,15 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     }
 
     function _redeemToken(uint256 _tokenId) internal {
-        uint256 stakeIndex = getStakeIndex(_tokenId);
-        uint256 stakeId = _checkToken(_tokenId, stakeIndex);
+        (uint256 stakeIndex, uint256 stakeId) = _checkToken(_tokenId);
         _closeStake(stakeIndex, stakeId);
         _burn(_tokenId);
     }
 
-    function _checkToken(uint256 _tokenId) internal view returns (uint256 stakeId) {
-        uint256 stakeIndex = getStakeIndex(_tokenId);
+    function _checkToken(uint256 _tokenId)
+        internal view returns (uint256 stakeIndex, uint256 stakeId)
+    {
+        stakeIndex = getStakeIndex(_tokenId);
         stakeId = _checkToken(_tokenId, stakeIndex);
     }
 
