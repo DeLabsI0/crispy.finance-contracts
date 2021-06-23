@@ -36,13 +36,23 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     )
         external
     {
-        require(_stakeAmounts.length == _stakeDays.length, "CHXS: Input length mismatch");
+        uint256 stakeAmountsLength = _stakeAmounts.length;
+        require(stakeAmountsLength == _stakeDays.length, "CHXS: Input length mismatch");
         _importFundsWithFee(_upfrontTotal, _maxFee);
         uint256 realTotal;
-        for (uint256 i; i < _stakeAmounts.length; i++) {
+        uint256 totalIssuedTokens_ = totalIssuedTokens;
+        for (uint256 i; i < stakeAmountsLength; i++) {
             uint256 stakeAmount = _stakeAmounts[i];
             realTotal += stakeAmount;
-            _issueNewTokenFor(_recipient, stakeAmount, _stakeDays[i]);
+            uint256 newTokenId;
+            unchecked {
+                newTokenId = totalIssuedTokens_ + i;
+            }
+            _openStake(stakeAmount, _stakeDays[i], newTokenId);
+            _safeMint(_recipient, newTokenId);
+        }
+        unchecked {
+            totalIssuedTokens += stakeAmountsLength;
         }
         uint256 stakeCost = _addFeeForTotal(realTotal, hexToken);
         require(_upfrontTotal >= stakeCost, "CHXS: Insufficient funds");
