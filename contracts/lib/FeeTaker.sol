@@ -14,6 +14,8 @@ abstract contract FeeTaker is Ownable {
     uint256 public fee;
     mapping(IERC20 => uint256) public accountedFees;
 
+    IERC20 internal constant NATIVE = IERC20(address(0));
+
     event FeeSet(address indexed setter, uint256 indexed fee);
     event AccountedFee(IERC20 indexed token, uint256 amount);
     event FeeWithdrawn(
@@ -36,7 +38,7 @@ abstract contract FeeTaker is Ownable {
             accountedFees[_token] = _accountedFee - _amount;
         }
         emit FeeWithdrawn(_token, msg.sender, _recipient, _amount);
-        if (address(_token) == address(0)) {
+        if (_token == NATIVE) {
             payable(_recipient).sendValue(_amount);
         } else {
             _token.safeTransfer(_recipient, _amount);
@@ -51,13 +53,17 @@ abstract contract FeeTaker is Ownable {
         require(_maxFee >= fee, "FeeTaker: fee too high");
     }
 
-    function _takeNativeFee(uint256 _totalAmount)
-        internal virtual returns (uint256)
+    function _takeFeeForTotal(uint256 _totalAmount, IERC20 _token)
+        internal virtual return (uint256)
     {
-        return _takeFee(IERC20(address(0)), _totalAmount);
+        uint256 fee_ = fee;
+        if (fee_ == 0) return _totalAmount;
+        uint256 feeToTake = realTotal * fee_ / (SCALE - fee_);
+        _accountFee(_token, feeToTake);
+        return _totalAmount + feeToTake;
     }
 
-    function _takeFee(IERC20 _token, uint256 _totalAmount)
+    function _takeFeeFrom(uint256 _totalAmount, IERC20 _token)
         internal virtual returns (uint256)
     {
         uint256 fee_ = fee;
@@ -67,13 +73,9 @@ abstract contract FeeTaker is Ownable {
         return _totalAmount - takenFee;
     }
 
-    function _accountNativeFee(uint256 _amount) internal virtual {
-        _accountFee(IERC20(address(0)), _amount);
-    }
-
-    function _accountFee(IERC20 _token, uint256 _amount) internal virtual {
-        accountedFees[_token] += _amount;
-        emit AccountedFee(_token, _amount);
+    function _accountFee(IERC20 _token, uint256 _fee) internal virtual {
+        accountedFees[_token] += _fee;
+        emit AccountedFee(_token, _fee);
     }
 
     function _setFee(uint256 _fee) internal virtual {
