@@ -20,6 +20,8 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     mapping(uint256 => uint256) internal _stakeIdOfToken;
     TwoWayMapping.UintToUint internal _tokenIdToStakeIndex;
 
+    event ExtendStake(uint256 indexed tokenId);
+
     constructor(uint256 _fee, IHex _hexToken)
         ERC721("Crispy.finance tokenized hex stakes", "CHXS")
         FeeTaker(_fee)
@@ -38,7 +40,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     {
         uint256 stakeAmountsLength = _stakeAmounts.length;
         require(stakeAmountsLength == _stakeDays.length, "CHXS: Input length mismatch");
-        _importFundsWithFee(_upfrontTotal, _maxFee);
+        _pullFundsAtFee(_upfrontTotal, _maxFee);
         uint256 realTotal;
         uint256 totalIssuedTokens_ = totalIssuedTokens;
         for (uint256 i; i < stakeAmountsLength; i++) {
@@ -48,8 +50,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
             unchecked {
                 newTokenId = totalIssuedTokens_ + i;
             }
-            _openStake(stakeAmount, _stakeDays[i], newTokenId);
-            _safeMint(_recipient, newTokenId);
+            _issueNewTokenFor(_recipient, stakeAmount, _stakeDays[i], newTokenId);
         }
         unchecked {
             totalIssuedTokens += stakeAmountsLength;
@@ -70,9 +71,10 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     )
         external
     {
-        _importFundsWithFee(_totalAmount, _maxFee);
+        _pullFundsAtFee(_totalAmount, _maxFee);
         uint256 stakeAmount = _takeFeeFrom(_totalAmount, hexToken);
-        _issueNewTokenFor(_recipient, stakeAmount, _stakeDays);
+        uint256 newTokenId = totalIssuedTokens++;
+        _issueNewTokenFor(_recipient, stakeAmount, _stakeDays, newTokenId);
     }
 
     function setBaseURI(string calldata _newBaseURI) external onlyOwner {
@@ -106,12 +108,13 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         external
     {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
-        _importFundsWithFee(_addedAmount, _maxFee);
+        _pullFundsAtFee(_addedAmount, _maxFee);
         (uint256 stakeIndex, uint256 stakeId) = _checkToken(_tokenId);
         _closeStake(stakeIndex, stakeId);
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         uint256 newStakeAmount = _takeFeeFrom(balanceAfter - balanceBefore, hexToken);
         _openStake(newStakeAmount, _newStakeDays, _tokenId);
+        emit ExtendStake(_tokenId);
     }
 
     /* should only be used if there is a bug in the sc and `unstakeTo` no longer
@@ -143,7 +146,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         return _stakeIdOfToken[_tokenId];
     }
 
-    function _importFundsWithFee(uint256 _total, uint256 _maxFee) internal {
+    function _pullFundsAtFee(uint256 _total, uint256 _maxFee) internal {
         _checkFeeAtMost(_maxFee);
         if (_total > 0) {
             hexToken.safeTransferFrom(msg.sender, address(this), _total);
@@ -153,13 +156,13 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     function _issueNewTokenFor(
         address _recipient,
         uint256 _stakeAmount,
-        uint256 _stakeDays
+        uint256 _stakeDays,
+        uint256 _newTokenId
     )
         internal
     {
-        uint256 newTokenId = totalIssuedTokens++;
-        _openStake(_stakeAmount, _stakeDays, newTokenId);
-        _safeMint(_recipient, newTokenId);
+        _openStake(_stakeAmount, _stakeDays, _newTokenId);
+        _safeMint(_recipient, _newTokenId);
     }
 
     function _openStake(
@@ -191,11 +194,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     function _checkToken(uint256 _tokenId, uint256 _stakeIndex)
         internal view returns (uint256 stakeId)
     {
-        address owner = ownerOf(_tokenId);
-        require(
-            msg.sender == owner || isApprovedForAll(owner, msg.sender),
-            "CHXS: Caller not approved"
-        );
+        require(_isApprovedOrOwner(msg.sender, _tokenId), "CHXS: Caller not approved");
         stakeId = _getStakeIdOf(_stakeIndex);
         require(_stakeIdOfToken[_tokenId] == stakeId, "CHXS: Invalid stake index");
     }
