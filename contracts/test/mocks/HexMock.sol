@@ -49,6 +49,7 @@ contract HexMock is ERC20, Ownable {
             )
         )));
         newStake.stakeId = stakeId;
+        newStake.stakedDays = uint16(newStakedDays);
 
         uint256 rewardHearts = newStakedHearts * (newStakedDays + 50) / 50;
         require(rewardHearts <= type(uint72).max, "Overflow");
