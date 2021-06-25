@@ -46,11 +46,10 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         for (uint256 i; i < stakeAmountsLength; i++) {
             uint256 stakeAmount = _stakeAmounts[i];
             realTotal += stakeAmount;
-            uint256 newTokenId;
             unchecked {
-                newTokenId = totalIssuedTokens_ + i;
+                uint256 newTokenId = totalIssuedTokens_ + i;
+                _issueNewTokenFor(_recipient, stakeAmount, _stakeDays[i], newTokenId);
             }
-            _issueNewTokenFor(_recipient, stakeAmount, _stakeDays[i], newTokenId);
         }
         unchecked {
             totalIssuedTokens += stakeAmountsLength;
