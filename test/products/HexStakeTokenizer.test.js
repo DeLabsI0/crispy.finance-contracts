@@ -35,7 +35,7 @@ describe('HexStakeTokenizer', () => {
       await this.staker.setFee(this.fee, { from: admin })
       await expectRevert(
         this.staker.createStakeFor(user1, ether('20'), 20, feePreChange, { from: user1 }),
-        'FeeTaker: fee too high'
+        'FeeTaker: Fee too high'
       )
     })
     it('disallows stake creation if user does not have sufficient funds', async () => {
@@ -251,7 +251,7 @@ describe('HexStakeTokenizer', () => {
         this.staker.createStakesFor(user1, [stakeAmount], [20], this.fee, totalDeposit, {
           from: user1
         }),
-        'FeeTaker: fee too high'
+        'FeeTaker: Fee too high'
       )
       await this.staker.setFee(this.fee, { from: admin })
     })

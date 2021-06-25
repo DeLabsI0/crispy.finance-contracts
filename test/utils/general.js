@@ -24,6 +24,11 @@ const getTxNonce = async (txId) => {
   return tx.nonce
 }
 
+const getFee = async (receipt) => {
+  const tx = await web3.eth.getTransaction(receipt.tx)
+  return safeBN(receipt.receipt.gasUsed).mul(safeBN(tx.gasPrice))
+}
+
 class _BalanceTracker {
   constructor(token, address) {
     this.token = token
@@ -32,7 +37,7 @@ class _BalanceTracker {
   }
 
   async _get() {
-    if (this.token === null) return await web3.eth.getBalance(this.address)
+    if (this.token === null) return safeBN(await web3.eth.getBalance(this.address))
     return await this.token.balanceOf(this.address)
   }
 
@@ -91,5 +96,6 @@ module.exports = {
   bnE,
   expectEqualWithinPrecision,
   expectEqualWithinFraction,
-  expectEqualWithinError
+  expectEqualWithinError,
+  getFee
 }

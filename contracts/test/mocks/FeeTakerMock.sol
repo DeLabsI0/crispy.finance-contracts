@@ -11,18 +11,28 @@ contract FeeTakerMock is FeeTaker {
     constructor(uint256 _fee) FeeTaker(_fee) { }
 
     function depositEthFee() external payable {
-        _accountFee(IERC20(address(0)), msg.value);
+        _accountFee(msg.value, NATIVE);
     }
 
-    function depositERC20Fee(IERC20 _token, uint256 _amount) external {
+    function depositERC20Fee(uint256 _amount, IERC20 _token) external {
         _token.safeTransferFrom(msg.sender, address(this), _amount);
-        _accountFee(_token, _amount);
+        _accountFee(_amount, _token);
     }
 
-    function takeFeeFrom(IERC20 _token, uint256 _amount) external {
+    function addFeeToTotal(uint256 _total, IERC20 _token) external {
+        uint256 afterFeeTotal = _addFeeForTotal(_total, _token);
+        _token.safeTransferFrom(msg.sender, address(this), afterFeeTotal);
+        _token.safeTransfer(msg.sender, _total);
+    }
+
+    function takeFeeFrom(uint256 _amount, IERC20 _token) external {
         _token.safeTransferFrom(msg.sender, address(this), _amount);
-        uint256 leftover = _takeFee(_token, _amount);
+        uint256 leftover = _takeFeeFrom(_amount, _token);
         _token.safeTransfer(msg.sender, leftover);
+    }
+
+    function checkFeeEqual(uint256 _fee) external view {
+        _checkFeeEqual(_fee);
     }
 
     function checkFeeAtMost(uint256 _maxFee) external view {

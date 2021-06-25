@@ -18,7 +18,7 @@ abstract contract FeeTaker is Ownable {
 
     event FeeSet(address indexed setter, uint256 indexed fee);
     event AccountedFee(IERC20 indexed token, uint256 amount);
-    event FeeWithdrawn(
+    event FeesWithdrawn(
         IERC20 indexed token,
         address indexed withdrawer,
         address indexed recipient,
@@ -29,19 +29,20 @@ abstract contract FeeTaker is Ownable {
         _setFee(_fee);
     }
 
-    function withdrawFeeTo(address _recipient, IERC20 _token, uint256 _amount)
+    function withdrawFeesTo(address _recipient, uint256 _amount, IERC20 _token)
         external virtual onlyOwner
     {
         uint256 _accountedFee = accountedFees[_token];
-        require(_accountedFee >= _amount, "FeeTaker: insufficient fees");
+        require(_accountedFee >= _amount, "FeeTaker: Insufficient fees");
         unchecked {
             accountedFees[_token] = _accountedFee - _amount;
         }
-        emit FeeWithdrawn(_token, msg.sender, _recipient, _amount);
         if (_token == NATIVE) {
+            emit FeesWithdrawn(_token, msg.sender, _recipient, _amount);
             payable(_recipient).sendValue(_amount);
         } else {
             _token.safeTransfer(_recipient, _amount);
+            emit FeesWithdrawn(_token, msg.sender, _recipient, _amount);
         }
     }
 
@@ -50,7 +51,11 @@ abstract contract FeeTaker is Ownable {
     }
 
     function _checkFeeAtMost(uint256 _maxFee) internal virtual view {
-        require(_maxFee >= fee, "FeeTaker: fee too high");
+        require(_maxFee >= fee, "FeeTaker: Fee too high");
+    }
+
+    function _checkFeeEqual(uint256 _fee) internal virtual view {
+        require(_fee == fee, "FeeTaker: Wrong fee");
     }
 
     function _addFeeForTotal(uint256 _totalAmount, IERC20 _token)
@@ -79,7 +84,7 @@ abstract contract FeeTaker is Ownable {
     }
 
     function _setFee(uint256 _fee) internal virtual {
-        require(_fee <= SCALE, "FeeTaker: fee above 100%");
+        require(_fee <= SCALE, "FeeTaker: Fee above 100%");
         fee = _fee;
         emit FeeSet(msg.sender, _fee);
     }
