@@ -22,6 +22,7 @@ const HDWalletProvider = require('@truffle/hdwallet-provider')
 require('dotenv').config()
 
 const devMnemonic = process.env.DEV_MNEMONIC
+const hotWalletMnemonic = process.env.HOT_MNEMONIC
 // const infuraKey = "fj4jll3k.....";
 //
 // const fs = require('fs');
@@ -51,6 +52,11 @@ module.exports = {
       port: 7545, // Standard Ethereum port (default: none)
       network_id: '5777', // Any network (default: none)
       provider: () => new HDWalletProvider(devMnemonic, 'http://127.0.0.1:7545')
+    },
+    xdai: {
+      network_id: '100',
+      gasPrice: '1000000000',
+      provider: () => new HDWalletProvider(hotWalletMnemonic, 'wss://rpc.xdaichain.com/wss')
     }
     // Another network with more advanced options...
     // advanced: {

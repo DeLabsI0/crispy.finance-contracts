@@ -1,4 +1,4 @@
-const { accounts, contract } = require('@openzeppelin/test-environment')
+const { accounts, contract, web3 } = require('@openzeppelin/test-environment')
 const { expectRevert, expectEvent, constants } = require('@openzeppelin/test-helpers')
 const { MAX_UINT256, ZERO_ADDRESS } = constants
 const { ether, trackBalance, safeBN, ZERO } = require('../utils/general')
@@ -8,12 +8,20 @@ const { expect } = require('chai')
 const HexStakeTokenizer = contract.fromArtifact('HexStakeTokenizer')
 const HexMock = contract.fromArtifact('HexMock')
 
+const formatNum = (num) => Intl.NumberFormat('en-us', { maximumFractionDigits: 3 }).format(num)
+
 describe('HexStakeTokenizer', () => {
   const hexTokens = (amount) => ether(amount, 'gwei').div(safeBN(10))
   before(async () => {
     this.hex = await HexMock.new({ from: admin })
     this.fee = ether('0.01')
     this.staker = await HexStakeTokenizer.new(this.fee, this.hex.address, { from: admin })
+    this.staker.totalOpenStakes = () => this.hex.stakeCount(this.staker.address)
+    this.staker.getTokenStakeId = async (tokenId) => {
+      const stakeIndex = await this.staker.getStakeIndex(tokenId)
+      const { stakeId } = await this.hex.stakeLists(this.staker.address, stakeIndex)
+      return stakeId
+    }
     this.scale = await this.staker.SCALE()
   })
   describe('owner functionality', () => {
@@ -72,10 +80,7 @@ describe('HexStakeTokenizer', () => {
       expect(await this.hex.stakeCount(this.staker.address)).to.be.bignumber.equal(safeBN(1))
       const stakeIndex = safeBN(0)
       const { stakeId } = await this.hex.stakeLists(this.staker.address, stakeIndex)
-      expect(await this.staker.getTokenStakeId(tokenId)).to.be.bignumber.equal(
-        stakeId,
-        'Wrong stakeId stored in staker'
-      )
+      expect(await this.staker.getTokenStakeId(tokenId)).to.be.bignumber.equal(stakeId)
       expect(await this.staker.getTokenId(stakeIndex)).to.be.bignumber.equal(tokenId)
       expect(await this.staker.getStakeIndex(tokenId)).to.be.bignumber.equal(stakeIndex)
       expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(1))
@@ -151,51 +156,56 @@ describe('HexStakeTokenizer', () => {
       expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(3))
     })
   })
-  describe('manual unstake', () => {
+  // describe('manual unstake', () => {
+  //   before(async () => {
+  //     const stakeAmount = hexTokens('2000')
+  //     await this.hex.mint(user1, stakeAmount, { from: admin })
+  //     await this.staker.createStakeFor(user1, stakeAmount, 30, this.fee, { from: user1 })
+  //   })
+  //   it('disallows non-owner from manually unstaking', async () => {
+  //     const tokenId = safeBN(2)
+  //     const stakeIndex = safeBN(0)
+  //     await expectRevert(
+  //       this.staker.manuallyUnstakeTo(attacker, tokenId, stakeIndex, { from: attacker }),
+  //       'CHXS: Caller not approved'
+  //     )
+  //     expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(2))
+  //     expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
+  //   })
+  //   it('only allows manual unstake with valid index', async () => {
+  //     const tokenId = safeBN(2)
+  //     const stakeIndex = safeBN(0)
+  //     const wrongStakeIndex = safeBN(1)
+  //     await expectRevert(
+  //       this.staker.manuallyUnstakeTo(user2, tokenId, wrongStakeIndex, { from: user2 }),
+  //       'CHXS: Invalid stake index'
+  //     )
+  //     const { stakeShares: stakeYield } = await this.hex.stakeLists(this.staker.address, stakeIndex)
+  //     const balTracker = await trackBalance(this.hex, user3)
+  //     await this.staker.manuallyUnstakeTo(user3, tokenId, stakeIndex, { from: user2 })
+  //     expect(await balTracker.delta()).to.be.bignumber.equal(stakeYield)
+  //     expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(1))
+  //     expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
+  //
+  //     const reorderedTokenId = safeBN(3)
+  //     const reorderedStakeIndex = safeBN(0)
+  //     expect(await this.staker.getTokenId(reorderedStakeIndex)).to.be.bignumber.equal(
+  //       reorderedTokenId
+  //     )
+  //     expect(await this.staker.getStakeIndex(reorderedTokenId)).to.be.bignumber.equal(
+  //       reorderedStakeIndex
+  //     )
+  //   })
+  // })
+  describe('multiple stake creation and redemption', () => {
     before(async () => {
       const stakeAmount = hexTokens('2000')
       await this.hex.mint(user1, stakeAmount, { from: admin })
       await this.staker.createStakeFor(user1, stakeAmount, 30, this.fee, { from: user1 })
-    })
-    it('disallows non-owner from manually unstaking', async () => {
-      const tokenId = safeBN(2)
-      const stakeIndex = safeBN(0)
-      await expectRevert(
-        this.staker.manuallyUnstakeTo(attacker, tokenId, stakeIndex, { from: attacker }),
-        'CHXS: Caller not approved'
-      )
-      expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(2))
-      expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
-    })
-    it('only allows manual unstake with valid index', async () => {
-      const tokenId = safeBN(2)
-      const stakeIndex = safeBN(0)
-      const wrongStakeIndex = safeBN(1)
-      await expectRevert(
-        this.staker.manuallyUnstakeTo(user2, tokenId, wrongStakeIndex, { from: user2 }),
-        'CHXS: Invalid stake index'
-      )
-      const { stakeShares: stakeYield } = await this.hex.stakeLists(this.staker.address, stakeIndex)
-      const balTracker = await trackBalance(this.hex, user3)
-      await this.staker.manuallyUnstakeTo(user3, tokenId, stakeIndex, { from: user2 })
-      expect(await balTracker.delta()).to.be.bignumber.equal(stakeYield)
-      expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(1))
-      expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
-
-      const reorderedTokenId = safeBN(3)
-      const reorderedStakeIndex = safeBN(0)
-      expect(await this.staker.getTokenId(reorderedStakeIndex)).to.be.bignumber.equal(
-        reorderedTokenId
-      )
-      expect(await this.staker.getStakeIndex(reorderedTokenId)).to.be.bignumber.equal(
-        reorderedStakeIndex
-      )
-    })
-  })
-  describe('multiple stake creation and redemption', () => {
-    before(async () => {
-      // reude open stakes to zero
-      await this.staker.unstakeTo(user1, safeBN(3), { from: user1 })
+      await this.staker.unstakeTo(user3, safeBN(2), { from: user2 })
+      // reduce open stakes to zero
+      const lastStakeTokenId = await this.staker.getTokenId(safeBN(0))
+      await this.staker.unstakeTo(user1, lastStakeTokenId, { from: user1 })
     })
     it('allows creation of multiple stakes', async () => {
       const totalStakeAmount = hexTokens('120000')
@@ -359,5 +369,19 @@ describe('HexStakeTokenizer', () => {
       expect(await balTracker.delta()).to.be.bignumber.equal(stakeYield)
     })
   })
-  describe('gas usage', () => {})
+  describe('gas usage', () => {
+    it('deployment', async () => {
+      const staker = await HexStakeTokenizer.new(ZERO, this.hex.address, { from: admin })
+      const { gasUsed } = await web3.eth.getTransactionReceipt(staker.transactionHash)
+      console.log(`deployment gas use: ${formatNum(gasUsed)}`)
+    })
+    it('create single stake', async () => {
+      const {
+        receipt: { gasUsed }
+      } = await this.staker.createStakeFor(user1, hexTokens('1000'), safeBN(10), this.fee, {
+        from: user1
+      })
+      console.log(`single stake creation gas use: ${formatNum(gasUsed)}`)
+    })
+  })
 })

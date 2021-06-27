@@ -13,11 +13,8 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
 
     IHex public immutable hexToken;
     uint256 public totalIssuedTokens;
-    uint256 public totalOpenStakes;
     string public currentBaseURI;
 
-    // stores stakeId to make sure stakes cannot be confused
-    mapping(uint256 => uint256) internal _stakeIdOfToken;
     TwoWayMapping.UintToUint internal _tokenIdToStakeIndex;
 
     event ExtendStake(uint256 indexed tokenId);
@@ -108,29 +105,11 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
         _pullFundsAtFee(_addedAmount, _maxFee);
-        (uint256 stakeIndex, uint256 stakeId) = _checkToken(_tokenId);
-        _closeStake(stakeIndex, stakeId);
+        _closeStake(_tokenId);
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         uint256 newStakeAmount = _takeFeeFrom(balanceAfter - balanceBefore, hexToken);
         _openStake(newStakeAmount, _newStakeDays, _tokenId);
         emit ExtendStake(_tokenId);
-    }
-
-    /* should only be used if there is a bug in the sc and `unstakeTo` no longer
-       works */
-    function manuallyUnstakeTo(
-        address _recipient,
-        uint256 _tokenId,
-        uint256 _stakeIndex
-    )
-        external
-    {
-        uint256 stakeId = _checkToken(_tokenId, _stakeIndex);
-        uint256 balanceBefore = hexToken.balanceOf(address(this));
-        _closeStake(_stakeIndex, stakeId);
-        _burn(_tokenId);
-        uint256 balanceAfter = hexToken.balanceOf(address(this));
-        hexToken.safeTransfer(_recipient, balanceAfter - balanceBefore);
     }
 
     function getStakeIndex(uint256 _tokenId) public view returns (uint256) {
@@ -139,10 +118,6 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
 
     function getTokenId(uint256 _stakeIndex) public view returns (uint256) {
         return _tokenIdToStakeIndex.rget(_stakeIndex);
-    }
-
-    function getTokenStakeId(uint256 _tokenId) public view returns (uint256) {
-        return _stakeIdOfToken[_tokenId];
     }
 
     function _pullFundsAtFee(uint256 _total, uint256 _maxFee) internal {
@@ -171,45 +146,38 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     )
         internal
     {
-        uint256 newStakeIndex = totalOpenStakes++;
+        uint256 newStakeIndex = hexToken.stakeCount(address(this));
         _tokenIdToStakeIndex.set(_tokenId, newStakeIndex);
         hexToken.stakeStart(_stakeAmount, _stakeDays);
-        _stakeIdOfToken[_tokenId] = _getStakeIdOf(newStakeIndex);
     }
 
     function _redeemToken(uint256 _tokenId) internal {
-        (uint256 stakeIndex, uint256 stakeId) = _checkToken(_tokenId);
-        _closeStake(stakeIndex, stakeId);
+        _closeStake(_tokenId);
         _burn(_tokenId);
     }
 
-    function _checkToken(uint256 _tokenId)
-        internal view returns (uint256 stakeIndex, uint256 stakeId)
+    function _closeStake(uint256 _tokenId) internal {
+        _authenticateToken(_tokenId);
+        (uint256 stakeIndex, uint40 stakeId) = _getStakeFromToken(_tokenId);
+        unchecked {
+            uint256 lastStakeIndex = hexToken.stakeCount(address(this)) - 1;
+            if (stakeIndex != lastStakeIndex) {
+                uint256 topTokenId = getTokenId(lastStakeIndex);
+                _tokenIdToStakeIndex.set(topTokenId, stakeIndex);
+            }
+            hexToken.stakeEnd(stakeIndex, stakeId);
+        }
+    }
+
+    function _authenticateToken(uint256 _tokenId) internal view {
+        require(_isApprovedOrOwner(msg.sender, _tokenId), "CHXS: Caller not approved");
+    }
+
+    function _getStakeFromToken(uint256 _tokenId)
+        internal view returns (uint256 stakeIndex, uint40 stakeId)
     {
         stakeIndex = getStakeIndex(_tokenId);
-        stakeId = _checkToken(_tokenId, stakeIndex);
-    }
-
-    function _checkToken(uint256 _tokenId, uint256 _stakeIndex)
-        internal view returns (uint256 stakeId)
-    {
-        require(_isApprovedOrOwner(msg.sender, _tokenId), "CHXS: Caller not approved");
-        stakeId = _getStakeIdOf(_stakeIndex);
-        require(_stakeIdOfToken[_tokenId] == stakeId, "CHXS: Invalid stake index");
-    }
-
-    function _closeStake(uint256 _stakeIndex, uint256 _stakeId) internal {
-        uint256 lastStakeIndex = --totalOpenStakes;
-        if (_stakeIndex != lastStakeIndex) {
-            uint256 topTokenId = getTokenId(lastStakeIndex);
-            _tokenIdToStakeIndex.set(topTokenId, _stakeIndex);
-        }
-        hexToken.stakeEnd(_stakeIndex, uint40(_stakeId));
-    }
-
-    function _getStakeIdOf(uint256 _stakeIndex) internal view returns (uint256) {
-        (uint40 stakeId,,,,,,) = hexToken.stakeLists(address(this), _stakeIndex);
-        return uint256(stakeId);
+        (stakeId,,,,,,) = hexToken.stakeLists(address(this), stakeIndex);
     }
 
     function _baseURI() internal view override returns (string memory) {
