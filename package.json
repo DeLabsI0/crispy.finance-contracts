@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "direct-test": "mocha --exit --recursive --timeout 20000",
+    "direct-test": "mocha --exit --recursive --timeout 200000",
     "test": "npm run compile && npm run direct-test",
     "compile": "truffle compile"
   },
@@ -28,6 +28,8 @@
     "eslint-plugin-prettier": "^3.3.0",
     "keccak": "^3.0.1",
     "mocha": "^8.2.1",
-    "rlp": "^2.2.6"
+    "regression": "^2.0.1",
+    "rlp": "^2.2.6",
+    "seedrandom": "^3.0.5"
   }
 }

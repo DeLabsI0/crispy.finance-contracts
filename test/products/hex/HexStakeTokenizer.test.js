@@ -1,9 +1,10 @@
 const { accounts, contract, web3 } = require('@openzeppelin/test-environment')
 const { expectRevert, expectEvent, constants } = require('@openzeppelin/test-helpers')
 const { MAX_UINT256, ZERO_ADDRESS } = constants
-const { ether, trackBalance, safeBN, ZERO } = require('../utils/general')
+const { ether, trackBalance, safeBN, ZERO } = require('../../utils/general')
 const [admin, attacker, user1, user2, user3] = accounts
 const { expect } = require('chai')
+const regression = require('regression')
 
 const HexStakeTokenizer = contract.fromArtifact('HexStakeTokenizer')
 const HexMock = contract.fromArtifact('HexMock')
@@ -156,47 +157,6 @@ describe('HexStakeTokenizer', () => {
       expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(3))
     })
   })
-  // describe('manual unstake', () => {
-  //   before(async () => {
-  //     const stakeAmount = hexTokens('2000')
-  //     await this.hex.mint(user1, stakeAmount, { from: admin })
-  //     await this.staker.createStakeFor(user1, stakeAmount, 30, this.fee, { from: user1 })
-  //   })
-  //   it('disallows non-owner from manually unstaking', async () => {
-  //     const tokenId = safeBN(2)
-  //     const stakeIndex = safeBN(0)
-  //     await expectRevert(
-  //       this.staker.manuallyUnstakeTo(attacker, tokenId, stakeIndex, { from: attacker }),
-  //       'CHXS: Caller not approved'
-  //     )
-  //     expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(2))
-  //     expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
-  //   })
-  //   it('only allows manual unstake with valid index', async () => {
-  //     const tokenId = safeBN(2)
-  //     const stakeIndex = safeBN(0)
-  //     const wrongStakeIndex = safeBN(1)
-  //     await expectRevert(
-  //       this.staker.manuallyUnstakeTo(user2, tokenId, wrongStakeIndex, { from: user2 }),
-  //       'CHXS: Invalid stake index'
-  //     )
-  //     const { stakeShares: stakeYield } = await this.hex.stakeLists(this.staker.address, stakeIndex)
-  //     const balTracker = await trackBalance(this.hex, user3)
-  //     await this.staker.manuallyUnstakeTo(user3, tokenId, stakeIndex, { from: user2 })
-  //     expect(await balTracker.delta()).to.be.bignumber.equal(stakeYield)
-  //     expect(await this.staker.totalOpenStakes()).to.be.bignumber.equal(safeBN(1))
-  //     expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(4))
-  //
-  //     const reorderedTokenId = safeBN(3)
-  //     const reorderedStakeIndex = safeBN(0)
-  //     expect(await this.staker.getTokenId(reorderedStakeIndex)).to.be.bignumber.equal(
-  //       reorderedTokenId
-  //     )
-  //     expect(await this.staker.getStakeIndex(reorderedTokenId)).to.be.bignumber.equal(
-  //       reorderedStakeIndex
-  //     )
-  //   })
-  // })
   describe('multiple stake creation and redemption', () => {
     before(async () => {
       const stakeAmount = hexTokens('2000')
@@ -221,8 +181,8 @@ describe('HexStakeTokenizer', () => {
         user2,
         [stake1Amount, stake2Amount, stake3Amount],
         [10, 20, 30],
-        this.fee,
         totalStakeAmount,
+        this.fee,
         { from: user1 }
       )
       expect(await balTracker.delta()).to.be.bignumber.equal(totalStakeAmount.neg())
@@ -258,7 +218,7 @@ describe('HexStakeTokenizer', () => {
       const stakeAmount = totalDeposit.sub(totalDeposit.mul(this.fee).div(this.scale))
       await this.staker.setFee(this.fee.mul(safeBN(2)), { from: admin })
       await expectRevert(
-        this.staker.createStakesFor(user1, [stakeAmount], [20], this.fee, totalDeposit, {
+        this.staker.createStakesFor(user1, [stakeAmount], [20], totalDeposit, this.fee, {
           from: user1
         }),
         'FeeTaker: Fee too high'
@@ -273,7 +233,7 @@ describe('HexStakeTokenizer', () => {
       const upfrontTotal = stakeAmount.mul(this.scale).div(this.scale.sub(origFee))
       await this.hex.mint(user1, upfrontTotal, { from: admin })
       const balTracker = await trackBalance(this.hex, user1)
-      await this.staker.createStakesFor(user1, [stakeAmount], [20], origFee, upfrontTotal, {
+      await this.staker.createStakesFor(user1, [stakeAmount], [20], upfrontTotal, origFee, {
         from: user1
       })
       const actualFee = stakeAmount.mul(this.fee).div(this.scale.sub(this.fee))
@@ -295,7 +255,7 @@ describe('HexStakeTokenizer', () => {
       expect(await this.staker.totalIssuedTokens()).to.be.bignumber.equal(safeBN(9))
       const tokenId = safeBN(8)
       await expectRevert(
-        this.staker.extendStakeLength(tokenId, safeBN(1), this.fee, ZERO, { from: attacker }),
+        this.staker.extendStakeLength(tokenId, safeBN(1), ZERO, this.fee, { from: attacker }),
         'CHXS: Caller not approved'
       )
       const stakeIndex = safeBN(0)
@@ -303,7 +263,7 @@ describe('HexStakeTokenizer', () => {
       const fee = stakeYield.mul(this.fee).div(this.scale)
       const newStakeAmount = stakeYield.sub(fee)
       const newStakeDays = safeBN(20)
-      const receipt = await this.staker.extendStakeLength(tokenId, newStakeDays, this.fee, ZERO, {
+      const receipt = await this.staker.extendStakeLength(tokenId, newStakeDays, ZERO, this.fee, {
         from: user1
       })
       expectEvent(receipt, 'AccountedFee', { token: this.hex.address, amount: fee })
@@ -326,7 +286,7 @@ describe('HexStakeTokenizer', () => {
       expect(await this.staker.ownerOf(tokenId2)).to.equal(user2)
       expect(await this.staker.getStakeIndex(tokenId1)).to.be.bignumber.equal(safeBN(0))
       expect(await this.staker.getStakeIndex(tokenId2)).to.be.bignumber.equal(safeBN(1))
-      await this.staker.extendStakeLength(tokenId1, safeBN(20), this.fee, ZERO, {
+      await this.staker.extendStakeLength(tokenId1, safeBN(20), ZERO, this.fee, {
         from: user1
       })
       expect(await this.staker.getStakeIndex(tokenId1)).to.be.bignumber.equal(safeBN(1))
@@ -343,8 +303,8 @@ describe('HexStakeTokenizer', () => {
       const receipt = await this.staker.extendStakeLength(
         tokenId,
         safeBN(30),
-        this.fee,
         addAmount,
+        this.fee,
         { from: user1 }
       )
       expectEvent(receipt, 'ExtendStake', { tokenId })
@@ -371,17 +331,101 @@ describe('HexStakeTokenizer', () => {
   })
   describe('gas usage', () => {
     it('deployment', async () => {
-      const staker = await HexStakeTokenizer.new(ZERO, this.hex.address, { from: admin })
-      const { gasUsed } = await web3.eth.getTransactionReceipt(staker.transactionHash)
+      this.fee = ether('0.001')
+      this.staker = await HexStakeTokenizer.new(this.fee, this.hex.address, { from: admin })
+      this.staker.scale = await this.staker.SCALE()
+      const { gasUsed } = await web3.eth.getTransactionReceipt(this.staker.transactionHash)
       console.log(`deployment gas use: ${formatNum(gasUsed)}`)
+      await this.hex.approve(this.staker.address, MAX_UINT256, { from: user1 })
     })
     it('create single stake', async () => {
-      const {
-        receipt: { gasUsed }
-      } = await this.staker.createStakeFor(user1, hexTokens('1000'), safeBN(10), this.fee, {
-        from: user1
-      })
-      console.log(`single stake creation gas use: ${formatNum(gasUsed)}`)
+      const { receipt } = await this.staker.createStakeFor(
+        user1,
+        hexTokens('1000'),
+        safeBN(10),
+        this.fee,
+        {
+          from: user1
+        }
+      )
+      console.log(`single stake creation gas use: ${formatNum(receipt.gasUsed)}`)
+    })
+    it('stake extension (no added funds)', async () => {
+      const { receipt } = await this.staker.extendStakeLength(
+        safeBN(0),
+        safeBN(30),
+        ZERO,
+        this.fee,
+        { from: user1 }
+      )
+      console.log(`single stake extension (no added funds) gas use: ${formatNum(receipt.gasUsed)}`)
+    })
+    it('stake extension (added funds)', async () => {
+      const { receipt } = await this.staker.extendStakeLength(
+        safeBN(0),
+        safeBN(50),
+        hexTokens('6000'),
+        this.fee,
+        { from: user1 }
+      )
+      console.log(`single stake extension (added funds) gas use: ${formatNum(receipt.gasUsed)}`)
+    })
+    it('unstake a single stake', async () => {
+      const { receipt } = await this.staker.unstakeTo(user1, safeBN(0), { from: user1 })
+      console.log(`single stake end gas use: ${formatNum(receipt.gasUsed)}`)
+    })
+    it('multiple stake creation', async () => {
+      this.multiIterations = 5
+      this.previouslyCreated = await this.staker.totalIssuedTokens()
+      const baseAmount = hexTokens('2000')
+      const amountIncrement = hexTokens('500')
+      const baseDays = safeBN(20)
+      const daysIncrement = safeBN(3)
+      const gasUsage = []
+      for (let i = 0, a = 1, b = 2; i < this.multiIterations; i++) {
+        [a, b] = [b, a + b]
+        let total = ZERO
+        const amounts = []
+        const dayss = []
+        for (let j = 0; j < a; j++) {
+          const amount = baseAmount.add(amountIncrement.mul(safeBN(j)))
+          const days = baseDays.add(daysIncrement.mul(safeBN(j)))
+          amounts.push(amount)
+          dayss.push(days)
+          total = total.add(amount)
+        }
+        const upfrontTotal = total.mul(this.fee).div(this.staker.scale.sub(this.fee)).add(total)
+        await this.hex.mint(user1, upfrontTotal, { from: admin })
+        const { receipt } = await this.staker.createStakesFor(
+          user1,
+          amounts,
+          dayss,
+          upfrontTotal,
+          this.fee,
+          { from: user1 }
+        )
+        gasUsage.push([a, receipt.gasUsed])
+      }
+      const [perStakeCost, fixedCost] = regression.linear(gasUsage).equation
+      console.log(`multi stake creation fixed gas cost: ${formatNum(fixedCost)}`)
+      console.log(`multi stake creation per stake gas cost: ${formatNum(perStakeCost)}`)
+    })
+    it('multiple stake ending', async () => {
+      const gasUsage = []
+      let tokenIdOffset = this.previouslyCreated
+      for (let i = 0, a = 1, b = 2; i < this.multiIterations; i++) {
+        [a, b] = [b, a + b]
+        const tokens = []
+        for (let j = 0; j < a; j++) {
+          tokens.push(tokenIdOffset.add(safeBN(j)))
+        }
+        tokenIdOffset = tokenIdOffset.add(safeBN(a))
+        const { receipt } = await this.staker.unstakeManyTo(user1, tokens, { from: user1 })
+        gasUsage.push([a, receipt.gasUsed])
+      }
+      const [perStakeCost, fixedCost] = regression.linear(gasUsage).equation
+      console.log(`multi stake ending fixed gas cost: ${formatNum(fixedCost)}`)
+      console.log(`multi stake ending per stake gas cost: ${formatNum(perStakeCost)}`)
     })
   })
 })

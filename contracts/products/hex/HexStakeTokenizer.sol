@@ -30,8 +30,8 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         address _recipient,
         uint256[] memory _stakeAmounts,
         uint256[] memory _stakeDays,
-        uint256 _maxFee,
-        uint256 _upfrontTotal
+        uint256 _upfrontTotal,
+        uint256 _maxFee
     )
         external
     {
@@ -81,8 +81,11 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         external
     {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
+        uint256 lastStakeIndex = hexToken.stakeCount(address(this)) - 1;
         for (uint256 i; i < _tokenIds.length; i++) {
-            _redeemToken(_tokenIds[i]);
+            unchecked {
+                _redeemToken(_tokenIds[i], lastStakeIndex - i);
+            }
         }
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         hexToken.safeTransfer(_recipient, balanceAfter - balanceBefore);
@@ -90,7 +93,7 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
 
     function unstakeTo(address _recipient, uint256 _tokenId) external {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
-        _redeemToken(_tokenId);
+        _redeemToken(_tokenId, hexToken.stakeCount(address(this)) - 1);
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         hexToken.safeTransfer(_recipient, balanceAfter - balanceBefore);
     }
@@ -98,14 +101,14 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
     function extendStakeLength(
         uint256 _tokenId,
         uint256 _newStakeDays,
-        uint256 _maxFee,
-        uint256 _addedAmount
+        uint256 _addedAmount,
+        uint256 _maxFee
     )
         external
     {
         uint256 balanceBefore = hexToken.balanceOf(address(this));
         _pullFundsAtFee(_addedAmount, _maxFee);
-        _closeStake(_tokenId);
+        _closeStake(_tokenId, hexToken.stakeCount(address(this)) - 1);
         uint256 balanceAfter = hexToken.balanceOf(address(this));
         uint256 newStakeAmount = _takeFeeFrom(balanceAfter - balanceBefore, hexToken);
         _openStake(newStakeAmount, _newStakeDays, _tokenId);
@@ -151,18 +154,17 @@ contract HexStakeTokenizer is ERC721, FeeTaker {
         hexToken.stakeStart(_stakeAmount, _stakeDays);
     }
 
-    function _redeemToken(uint256 _tokenId) internal {
-        _closeStake(_tokenId);
+    function _redeemToken(uint256 _tokenId, uint256 _lastStakeIndex) internal {
+        _closeStake(_tokenId, _lastStakeIndex);
         _burn(_tokenId);
     }
 
-    function _closeStake(uint256 _tokenId) internal {
+    function _closeStake(uint256 _tokenId, uint256 _lastStakeIndex) internal {
         _authenticateToken(_tokenId);
         (uint256 stakeIndex, uint40 stakeId) = _getStakeFromToken(_tokenId);
         unchecked {
-            uint256 lastStakeIndex = hexToken.stakeCount(address(this)) - 1;
-            if (stakeIndex != lastStakeIndex) {
-                uint256 topTokenId = getTokenId(lastStakeIndex);
+            if (stakeIndex != _lastStakeIndex) {
+                uint256 topTokenId = getTokenId(_lastStakeIndex);
                 _tokenIdToStakeIndex.set(topTokenId, stakeIndex);
             }
             hexToken.stakeEnd(stakeIndex, stakeId);
